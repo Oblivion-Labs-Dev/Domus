@@ -1,0 +1,10 @@
+{
+  "name": "Domus — Family Operating Hub",
+  "short_name": "Domus",
+  "description": "Shared family calendar, time-booking, exercise & diet trackers, and household lists with role-based permissions.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafaf8",
+  "theme_color": "#1c1a17",
+  "icons": []
+}
