@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Home, Lock, Shield, Sparkles, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowRight, Crown, Home, Lock, Shield, Sparkles } from "lucide-react";
 import { ROLE_META } from "@/lib/rbac";
+import IsometricHomeScene from "./IsometricHomeScene";
+import TiltCard from "./TiltCard";
 import type { HouseholdDTO, MemberDTO } from "./types";
 
 interface LoginViewProps {
@@ -65,79 +68,128 @@ export default function LoginView({
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-stone-900 text-white shadow-sm">
+    <div className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        {/* Header Bar */}
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 flex flex-wrap items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3.5">
+            <motion.div
+              whileHover={{ rotate: -6, y: -2 }}
+              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-b from-stone-800 to-stone-900 text-white"
+              style={{
+                boxShadow:
+                  "inset 0 1px 0 rgba(255,255,255,0.22), 0 5px 0 0 #0b0a08, 0 14px 26px -8px rgba(25,23,20,0.35)",
+              }}
+            >
               <Home className="h-5 w-5" />
-            </div>
+            </motion.div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-stone-900">
+              <h1 className="text-xl font-bold tracking-tight text-stone-900">
                 Domus
               </h1>
-              <p className="text-xs text-stone-500">
+              <p className="text-xs font-medium text-stone-500">
                 {household?.name ?? "Family Operating Hub"} · Oblivion Labs
               </p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-600">
-            <Shield className="h-3.5 w-3.5 text-terracotta-500" />
-            Role-Based Family Permissions
-          </span>
-        </div>
 
-        <div className="grid gap-8 lg:grid-cols-12">
-          {/* Left column: Value prop + Quick Demo Role Picker */}
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-700"
+            style={{
+              boxShadow:
+                "inset 0 1px 0 #fff, 0 3px 0 0 rgba(212,206,192,0.85)",
+            }}
+          >
+            <Shield className="h-3.5 w-3.5 text-terracotta-500" />
+            Real Family Roles &amp; Permissions
+          </span>
+        </motion.div>
+
+        <div className="grid items-start gap-8 lg:grid-cols-12">
+          {/* Left Column: Hero + 2.5D Isometric Scene + Role Switcher */}
           <div className="space-y-6 lg:col-span-7">
-            <div className="space-y-3">
-              <h2 className="text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-                One calm home for overlapping plans, time-booking, health &amp;
-                lists.
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="space-y-3"
+            >
+              <h2 className="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
+                One tactile space for overlapping plans, time-booking, health
+                &amp; home lists.
               </h2>
               <p className="max-w-xl text-sm leading-relaxed text-stone-600">
                 Lighter than Notion, built deeper than Google Calendar. Track
                 exercise, diet, driving lessons, and yoga alongside shared
-                shopping, meal prep, and lawn chores — governed by real family
-                roles.
+                shopping, meal prep, and lawn chores — governed by a real Head
+                of Family.
               </p>
-            </div>
+            </motion.div>
+
+            {/* Interactive 2.5D Isometric Diorama */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.12, type: "spring", stiffness: 220 }}
+            >
+              <IsometricHomeScene />
+            </motion.div>
 
             {demoSwitcherEnabled && demoMembers.length > 0 && (
-              <div className="domus-card p-5">
-                <div className="mb-3 flex items-center justify-between">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18 }}
+                className="domus-card p-5"
+              >
+                <div className="mb-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-terracotta-500" />
-                    <h3 className="text-sm font-semibold text-stone-900">
-                      Instant Demo Sign-In by Household Role
+                    <h3 className="text-sm font-bold text-stone-900">
+                      Jump In as Any Family Role
                     </h3>
                   </div>
-                  <span className="text-xs text-stone-400">
-                    Click any member to test RBAC
+                  <span className="text-xs font-medium text-stone-400">
+                    Live RBAC preview
                   </span>
                 </div>
 
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {demoMembers.map((m) => (
-                    <button
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {demoMembers.map((m, idx) => (
+                    <motion.button
                       key={m.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 + idx * 0.05 }}
+                      whileHover={{ y: -3, scale: 1.015 }}
+                      whileTap={{ y: 1, scale: 0.985 }}
                       disabled={loading}
                       onClick={() => handleQuickSwitch(m.id)}
-                      className="group flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50/70 p-3 text-left transition hover:border-stone-400 hover:bg-white"
+                      className="domus-tile group flex items-center justify-between p-3 text-left"
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                          style={{ backgroundColor: m.color }}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white"
+                          style={{
+                            backgroundColor: m.color,
+                            boxShadow: `0 3px 0 0 ${m.color}88, 0 8px 14px -4px ${m.color}66`,
+                          }}
                         >
                           {m.avatarInitials}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-semibold text-stone-900">
+                            <span className="truncate text-sm font-bold text-stone-900">
                               {m.name}
                             </span>
-                            <span className="rounded-md bg-stone-200/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-700">
+                            {m.role === "HEAD" && (
+                              <Crown className="h-3.5 w-3.5 text-terracotta-500" />
+                            )}
+                            <span className="rounded-md bg-stone-200/80 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-700">
                               {ROLE_META[m.role]?.badge ?? m.role}
                             </span>
                           </div>
@@ -146,28 +198,39 @@ export default function LoginView({
                           </p>
                         </div>
                       </div>
-                      <ArrowRight className="h-4 w-4 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-stone-900" />
-                    </button>
+                      <ArrowRight className="h-4 w-4 text-stone-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-stone-900" />
+                    </motion.button>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
 
-          {/* Right column: Standard Email / Password Sign-in */}
-          <div className="lg:col-span-5">
-            <div className="domus-card p-6 sm:p-7">
-              <div className="mb-5 flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-stone-100 text-stone-700">
-                  <Lock className="h-4 w-4" />
+          {/* Right Column: 2.5D Tilt Sign-In Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.16 }}
+            className="lg:col-span-5 lg:sticky lg:top-8"
+          >
+            <TiltCard maxTilt={5} lift={4} className="p-6 sm:p-7">
+              <div className="mb-6 flex items-center gap-3">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl bg-stone-100 text-stone-800"
+                  style={{
+                    boxShadow:
+                      "inset 0 1px 0 #fff, 0 3px 0 0 rgba(212,206,192,0.9)",
+                  }}
+                >
+                  <Lock className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-stone-900">
+                  <h3 className="text-base font-bold text-stone-900">
                     Sign in to your household
                   </h3>
                   <p className="text-xs text-stone-500">
-                    Default demo password:{" "}
-                    <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-stone-700">
+                    Demo password:{" "}
+                    <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono font-semibold text-stone-700">
                       domus123
                     </code>
                   </p>
@@ -176,7 +239,7 @@ export default function LoginView({
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-stone-600">
+                  <label className="mb-1.5 block text-xs font-semibold text-stone-600">
                     Family Email
                   </label>
                   <input
@@ -189,7 +252,7 @@ export default function LoginView({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-stone-600">
+                  <label className="mb-1.5 block text-xs font-semibold text-stone-600">
                     Password
                   </label>
                   <input
@@ -202,7 +265,7 @@ export default function LoginView({
                 </div>
 
                 {error && (
-                  <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
                     {error}
                   </p>
                 )}
@@ -212,11 +275,11 @@ export default function LoginView({
                   disabled={loading}
                   className="domus-btn-primary w-full py-2.5"
                 >
-                  {loading ? "Signing in..." : "Enter Domus"}
+                  {loading ? "Entering Domus..." : "Enter Household"}
                 </button>
               </form>
-            </div>
-          </div>
+            </TiltCard>
+          </motion.div>
         </div>
       </div>
     </div>

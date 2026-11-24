@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
   Circle,
@@ -149,10 +150,10 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+          <p className="text-xs font-bold uppercase tracking-widest text-stone-500">
             Shared Execution
           </p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
             Shopping, Meal Prep &amp; Household Chores
           </h2>
           <p className="text-sm text-stone-500">
@@ -173,85 +174,97 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
       </div>
 
       {feedback && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800">
           {feedback}
         </div>
       )}
 
-      {showNewList && canCreateList && (
-        <form
-          onSubmit={handleCreateList}
-          className="domus-card flex flex-wrap items-end gap-3 p-4"
-        >
-          <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
-              List Name
-            </label>
-            <input
-              required
-              value={listTitle}
-              onChange={(e) => setListTitle(e.target.value)}
-              placeholder="e.g., Weekend Road Trip Packing, Garden Supplies"
-              className="domus-input"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-stone-600">
-              Type
-            </label>
-            <select
-              value={listType}
-              onChange={(e) =>
-                setListType(
-                  e.target.value as
-                    | "SHOPPING"
-                    | "MEAL_PREP"
-                    | "CHORES"
-                    | "GENERAL"
-                )
-              }
-              className="domus-input"
-            >
-              <option value="SHOPPING">Shopping</option>
-              <option value="MEAL_PREP">Meal Prep</option>
-              <option value="CHORES">Home &amp; Yard Chores</option>
-              <option value="GENERAL">General</option>
-            </select>
-          </div>
-          <button type="submit" className="domus-btn-primary">
-            Create
-          </button>
-        </form>
-      )}
+      <AnimatePresence>
+        {showNewList && canCreateList && (
+          <motion.form
+            initial={{ opacity: 0, y: -10, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.985 }}
+            onSubmit={handleCreateList}
+            className="domus-card flex flex-wrap items-end gap-3 p-4"
+          >
+            <div className="min-w-[200px] flex-1">
+              <label className="mb-1 block text-xs font-semibold text-stone-600">
+                List Name
+              </label>
+              <input
+                required
+                value={listTitle}
+                onChange={(e) => setListTitle(e.target.value)}
+                placeholder="e.g., Weekend Road Trip Packing, Garden Supplies"
+                className="domus-input"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">
+                Type
+              </label>
+              <select
+                value={listType}
+                onChange={(e) =>
+                  setListType(
+                    e.target.value as
+                      | "SHOPPING"
+                      | "MEAL_PREP"
+                      | "CHORES"
+                      | "GENERAL"
+                  )
+                }
+                className="domus-input"
+              >
+                <option value="SHOPPING">Shopping</option>
+                <option value="MEAL_PREP">Meal Prep</option>
+                <option value="CHORES">Home &amp; Yard Chores</option>
+                <option value="GENERAL">General</option>
+              </select>
+            </div>
+            <button type="submit" className="domus-btn-primary">
+              Create
+            </button>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left: List Selector */}
-        <div className="space-y-2.5 lg:col-span-4">
+        {/* Left: 2.5D Stacked List Selector */}
+        <div className="space-y-3 lg:col-span-4">
           {lists.map((list) => {
             const openCount = list.items.filter((i) => !i.isCompleted).length;
             const selected = activeList?.id === list.id;
             return (
-              <button
+              <motion.button
                 key={list.id}
+                whileHover={{ y: -3, x: selected ? 0 : 3 }}
+                whileTap={{ y: 1, scale: 0.985 }}
                 onClick={() => setActiveListId(list.id)}
-                className={`flex w-full items-start justify-between rounded-2xl border p-4 text-left transition ${
+                className={`flex w-full items-start justify-between rounded-2xl border p-4 text-left transition-all ${
                   selected
-                    ? "border-stone-900 bg-stone-900 text-white shadow-sm"
+                    ? "border-stone-900 bg-gradient-to-b from-stone-800 to-stone-900 text-white"
                     : "border-stone-200 bg-white text-stone-800 hover:border-stone-400"
                 }`}
+                style={{
+                  boxShadow: selected
+                    ? "inset 0 1px 0 rgba(255,255,255,0.18), 0 5px 0 0 #0b0a08, 0 16px 26px -10px rgba(25,23,20,0.4)"
+                    : "inset 0 1px 0 #fff, 0 3px 0 0 rgba(212,206,192,0.85), 0 8px 18px -10px rgba(25,23,20,0.1)",
+                }}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className={`mt-0.5 rounded-xl p-2 ${
                       selected
                         ? "bg-white/15 text-white"
-                        : "bg-stone-100 text-stone-600"
+                        : "bg-stone-100 text-stone-700"
                     }`}
                   >
                     {iconForList(list.type)}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">{list.title}</p>
+                    <p className="text-sm font-bold">{list.title}</p>
                     <p
                       className={`mt-0.5 text-xs ${
                         selected ? "text-stone-300" : "text-stone-500"
@@ -262,15 +275,15 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
                   </div>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
                     selected
-                      ? "bg-white/20 text-white"
+                      ? "bg-terracotta-500 text-white"
                       : "bg-stone-100 text-stone-700"
                   }`}
                 >
                   {openCount}
                 </span>
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -281,7 +294,7 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
             <div className="domus-card p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-stone-900">
+                  <h3 className="text-lg font-bold text-stone-900">
                     {activeList.title}
                   </h3>
                   <p className="text-xs text-stone-500">
@@ -290,7 +303,7 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
                   </p>
                 </div>
 
-                <div className="flex rounded-xl bg-stone-100 p-1 text-xs font-medium">
+                <div className="flex rounded-xl bg-stone-100 p-1 text-xs font-semibold">
                   {(
                     [
                       ["ALL", "All"],
@@ -301,13 +314,24 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
                     <button
                       key={key}
                       onClick={() => setFilterMode(key)}
-                      className={`rounded-lg px-3 py-1 transition ${
+                      className={`relative rounded-lg px-3 py-1 transition ${
                         filterMode === key
-                          ? "bg-white text-stone-900 shadow-sm"
-                          : "text-stone-600"
+                          ? "text-stone-900"
+                          : "text-stone-500 hover:text-stone-800"
                       }`}
                     >
-                      {label}
+                      {filterMode === key && (
+                        <motion.span
+                          layoutId="list-filter-pill"
+                          transition={{
+                            type: "spring",
+                            stiffness: 420,
+                            damping: 30,
+                          }}
+                          className="absolute inset-0 rounded-lg bg-white shadow-sm"
+                        />
+                      )}
+                      <span className="relative z-10">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -316,7 +340,8 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
               {/* Quick-add form */}
               <form
                 onSubmit={handleAddItem}
-                className="mb-5 grid gap-2.5 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:grid-cols-12"
+                className="mb-5 grid gap-2.5 rounded-2xl border border-stone-200/90 bg-stone-50/90 p-3.5 sm:grid-cols-12"
+                style={{ boxShadow: "inset 0 2px 5px rgba(25,23,20,0.04)" }}
               >
                 <input
                   required
@@ -357,16 +382,16 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
                 </select>
                 <div className="flex items-center justify-between gap-2 sm:col-span-12">
                   <div className="flex items-center gap-2 text-xs text-stone-500">
-                    <span>Priority:</span>
+                    <span className="font-semibold">Priority:</span>
                     {(["LOW", "MEDIUM", "HIGH"] as const).map((p) => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => setItemPriority(p)}
-                        className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold ${
+                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
                           itemPriority === p
-                            ? "bg-stone-900 text-white"
-                            : "bg-white text-stone-600"
+                            ? "bg-stone-900 text-white shadow-sm"
+                            : "bg-white text-stone-600 hover:bg-stone-100"
                         }`}
                       >
                         {p}
@@ -380,80 +405,97 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
                 </div>
               </form>
 
-              {/* Items */}
-              <div className="space-y-2">
+              {/* Tactile Animated List Items */}
+              <div className="space-y-2.5">
                 {visibleItems.length === 0 ? (
                   <p className="py-6 text-center text-xs text-stone-400">
                     No items in this view.
                   </p>
                 ) : (
-                  visibleItems.map((item) => {
-                    const assignee = item.assigneeId
-                      ? memberById.get(item.assigneeId)
-                      : null;
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 transition ${
-                          item.isCompleted
-                            ? "border-stone-100 bg-stone-50/50 opacity-65"
-                            : "border-stone-200 bg-white"
-                        }`}
-                      >
-                        <button
-                          onClick={() => handleToggle(item)}
-                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  <AnimatePresence initial={false}>
+                    {visibleItems.map((item) => {
+                      const assignee = item.assigneeId
+                        ? memberById.get(item.assigneeId)
+                        : null;
+                      return (
+                        <motion.div
+                          key={item.id}
+                          layout
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.96 }}
+                          whileHover={{ y: -2 }}
+                          className={`domus-tile flex items-center justify-between gap-3 px-4 py-3 ${
+                            item.isCompleted ? "opacity-65" : ""
+                          }`}
                         >
-                          {item.isCompleted ? (
-                            <CheckCircle2 className="h-5 w-5 shrink-0 text-sage-600" />
-                          ) : (
-                            <Circle className="h-5 w-5 shrink-0 text-stone-300" />
-                          )}
-                          <div className="min-w-0">
-                            <p
-                              className={`text-sm font-medium ${
-                                item.isCompleted
-                                  ? "text-stone-400 line-through"
-                                  : "text-stone-900"
-                              }`}
+                          <button
+                            onClick={() => handleToggle(item)}
+                            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          >
+                            <motion.span
+                              whileTap={{ scale: 0.78 }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 18,
+                              }}
                             >
-                              {item.title}
-                            </p>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-stone-400">
-                              <span>{item.category || "General"}</span>
-                              {item.quantity && <span>· {item.quantity}</span>}
-                              {item.priority === "HIGH" && !item.isCompleted && (
-                                <span className="rounded bg-terracotta-100 px-1.5 py-0.2 font-semibold text-terracotta-700">
-                                  HIGH
-                                </span>
+                              {item.isCompleted ? (
+                                <CheckCircle2 className="h-5 w-5 shrink-0 text-sage-600" />
+                              ) : (
+                                <Circle className="h-5 w-5 shrink-0 text-stone-300 transition-colors hover:text-terracotta-500" />
                               )}
+                            </motion.span>
+                            <div className="min-w-0">
+                              <p
+                                className={`text-sm font-semibold transition-all ${
+                                  item.isCompleted
+                                    ? "text-stone-400 line-through"
+                                    : "text-stone-900"
+                                }`}
+                              >
+                                {item.title}
+                              </p>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-stone-400">
+                                <span>{item.category || "General"}</span>
+                                {item.quantity && <span>· {item.quantity}</span>}
+                                {item.priority === "HIGH" &&
+                                  !item.isCompleted && (
+                                    <span className="rounded bg-terracotta-100 px-1.5 py-0.2 font-bold text-terracotta-700">
+                                      HIGH
+                                    </span>
+                                  )}
+                              </div>
                             </div>
-                          </div>
-                        </button>
+                          </button>
 
-                        <div className="flex shrink-0 items-center gap-2">
-                          {assignee && (
-                            <span
-                              className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white"
-                              style={{ backgroundColor: assignee.color }}
-                            >
-                              {assignee.name}
-                            </span>
-                          )}
-                          {(item.createdById === currentMember.id ||
-                            canCreateList) && (
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="rounded-lg p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
-                              title="Delete item"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
+                          <div className="flex shrink-0 items-center gap-2">
+                            {assignee && (
+                              <span
+                                className="rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm"
+                                style={{ backgroundColor: assignee.color }}
+                              >
+                                {assignee.name}
+                              </span>
+                            )}
+                            {(item.createdById === currentMember.id ||
+                              canCreateList) && (
+                              <motion.button
+                                whileHover={{ scale: 1.15 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="rounded-lg p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                                title="Delete item"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </motion.button>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
                 )}
               </div>
             </div>

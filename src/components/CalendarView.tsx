@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   CalendarPlus,
@@ -246,10 +247,10 @@ export default function CalendarView({
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-terracotta-600">
+          <p className="text-xs font-bold uppercase tracking-widest text-terracotta-600">
             Overlap Engine
           </p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
             Common Calendar &amp; Time-Booking
           </h2>
           <p className="text-sm text-stone-500">
@@ -270,186 +271,199 @@ export default function CalendarView({
       </div>
 
       {feedback && (
-        <div
-          className={`rounded-xl border px-4 py-2.5 text-sm ${
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`rounded-xl border px-4 py-2.5 text-sm font-medium ${
             feedback.type === "ok"
               ? "border-sage-200 bg-sage-50 text-sage-700"
               : "border-red-200 bg-red-50 text-red-700"
           }`}
         >
           {feedback.text}
-        </div>
+        </motion.div>
       )}
 
-      {/* Add Event Drawer */}
-      {showAddEvent && canCreate && (
-        <form onSubmit={handleCreateEvent} className="domus-card space-y-4 p-5">
-          <h3 className="text-sm font-semibold text-stone-900">
-            Schedule a New Household or Individual Plan
-          </h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Title
-              </label>
-              <input
-                required
-                value={evtTitle}
-                onChange={(e) => setEvtTitle(e.target.value)}
-                placeholder="e.g., Driving Lesson, Evening Yoga, Grocery Run"
-                className="domus-input"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Category
-              </label>
-              <select
-                value={evtCategory}
-                onChange={(e) => setEvtCategory(e.target.value)}
-                className="domus-input"
-              >
-                <option value="FAMILY">Family Shared</option>
-                <option value="DRIVING">Driving Lessons</option>
-                <option value="YOGA">Yoga</option>
-                <option value="EXERCISE">Exercise</option>
-                <option value="DIET">Diet / Meal Prep</option>
-                <option value="SHOPPING">Shopping</option>
-                <option value="CHORE">Chore / Lawn</option>
-                <option value="PERSONAL">Personal</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Visibility
-              </label>
-              <select
-                value={evtVisibility}
-                onChange={(e) =>
-                  setEvtVisibility(
-                    e.target.value as "FAMILY" | "ADULTS_ONLY" | "PRIVATE"
-                  )
-                }
-                className="domus-input"
-              >
-                <option value="FAMILY">Family (Visible to all)</option>
-                <option value="ADULTS_ONLY">Adults Only</option>
-                <option value="PRIVATE">Private (Shows as Busy)</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Date
-              </label>
-              <input
-                type="date"
-                required
-                value={evtDate}
-                onChange={(e) => setEvtDate(e.target.value)}
-                className="domus-input"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Start Time
-              </label>
-              <input
-                type="time"
-                required
-                value={evtStart}
-                onChange={(e) => setEvtStart(e.target.value)}
-                className="domus-input"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                End Time
-              </label>
-              <input
-                type="time"
-                required
-                value={evtEnd}
-                onChange={(e) => setEvtEnd(e.target.value)}
-                className="domus-input"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
-                Location
-              </label>
-              <input
-                value={evtLocation}
-                onChange={(e) => setEvtLocation(e.target.value)}
-                placeholder="Home / Costco / Gym"
-                className="domus-input"
-              />
-            </div>
-          </div>
-
-          {canCreateShared && (
-            <div className="space-y-2 border-t border-stone-100 pt-3">
-              <label className="inline-flex items-center gap-2 text-xs font-medium text-stone-700">
+      {/* Animated Spring Add Event Drawer */}
+      <AnimatePresence>
+        {showAddEvent && canCreate && (
+          <motion.form
+            initial={{ opacity: 0, y: -12, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.985 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+            onSubmit={handleCreateEvent}
+            className="domus-card space-y-4 p-5"
+          >
+            <h3 className="text-sm font-bold text-stone-900">
+              Schedule a New Household or Individual Plan
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs font-semibold text-stone-600">
+                  Title
+                </label>
                 <input
-                  type="checkbox"
-                  checked={evtShared}
-                  onChange={(e) => setEvtShared(e.target.checked)}
-                  className="rounded border-stone-300"
+                  required
+                  value={evtTitle}
+                  onChange={(e) => setEvtTitle(e.target.value)}
+                  placeholder="e.g., Driving Lesson, Evening Yoga, Grocery Run"
+                  className="domus-input"
                 />
-                Mark as Shared / Overlapping Event &amp; invite family members
-              </label>
-              {evtShared && (
-                <div className="flex flex-wrap gap-2">
-                  {members
-                    .filter((m) => m.id !== currentMember.id)
-                    .map((m) => {
-                      const active = evtParticipants.includes(m.id);
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() =>
-                            setEvtParticipants((prev) =>
-                              active
-                                ? prev.filter((id) => id !== m.id)
-                                : [...prev, m.id]
-                            )
-                          }
-                          className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                            active
-                              ? "border-stone-900 bg-stone-900 text-white"
-                              : "border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100"
-                          }`}
-                        >
-                          {m.name}
-                        </button>
-                      );
-                    })}
-                </div>
-              )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-stone-600">
+                  Category
+                </label>
+                <select
+                  value={evtCategory}
+                  onChange={(e) => setEvtCategory(e.target.value)}
+                  className="domus-input"
+                >
+                  <option value="FAMILY">Family Shared</option>
+                  <option value="DRIVING">Driving Lessons</option>
+                  <option value="YOGA">Yoga</option>
+                  <option value="EXERCISE">Exercise</option>
+                  <option value="DIET">Diet / Meal Prep</option>
+                  <option value="SHOPPING">Shopping</option>
+                  <option value="CHORE">Chore / Lawn</option>
+                  <option value="PERSONAL">Personal</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-stone-600">
+                  Visibility
+                </label>
+                <select
+                  value={evtVisibility}
+                  onChange={(e) =>
+                    setEvtVisibility(
+                      e.target.value as "FAMILY" | "ADULTS_ONLY" | "PRIVATE"
+                    )
+                  }
+                  className="domus-input"
+                >
+                  <option value="FAMILY">Family (Visible to all)</option>
+                  <option value="ADULTS_ONLY">Adults Only</option>
+                  <option value="PRIVATE">Private (Shows as Busy)</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-stone-600">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={evtDate}
+                  onChange={(e) => setEvtDate(e.target.value)}
+                  className="domus-input"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-stone-600">
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={evtStart}
+                  onChange={(e) => setEvtStart(e.target.value)}
+                  className="domus-input"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-stone-600">
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  required
+                  value={evtEnd}
+                  onChange={(e) => setEvtEnd(e.target.value)}
+                  className="domus-input"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-stone-600">
+                  Location
+                </label>
+                <input
+                  value={evtLocation}
+                  onChange={(e) => setEvtLocation(e.target.value)}
+                  placeholder="Home / Costco / Gym"
+                  className="domus-input"
+                />
+              </div>
             </div>
-          )}
 
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowAddEvent(false)}
-              className="domus-btn-secondary"
-            >
-              Cancel
-            </button>
-            <button type="submit" className="domus-btn-primary">
-              Save to Calendar
-            </button>
-          </div>
-        </form>
-      )}
+            {canCreateShared && (
+              <div className="space-y-2 border-t border-stone-100 pt-3">
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={evtShared}
+                    onChange={(e) => setEvtShared(e.target.checked)}
+                    className="rounded border-stone-300"
+                  />
+                  Mark as Shared / Overlapping Event &amp; invite family members
+                </label>
+                {evtShared && (
+                  <div className="flex flex-wrap gap-2">
+                    {members
+                      .filter((m) => m.id !== currentMember.id)
+                      .map((m) => {
+                        const active = evtParticipants.includes(m.id);
+                        return (
+                          <motion.button
+                            key={m.id}
+                            type="button"
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() =>
+                              setEvtParticipants((prev) =>
+                                active
+                                  ? prev.filter((id) => id !== m.id)
+                                  : [...prev, m.id]
+                              )
+                            }
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                              active
+                                ? "border-stone-900 bg-stone-900 text-white shadow-sm"
+                                : "border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100"
+                            }`}
+                          >
+                            {m.name}
+                          </motion.button>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAddEvent(false)}
+                className="domus-btn-secondary"
+              >
+                Cancel
+              </button>
+              <button type="submit" className="domus-btn-primary">
+                Save to Calendar
+              </button>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Left 7 cols: Unified Calendar Stream */}
         <div className="space-y-4 lg:col-span-7">
-          {/* Filters */}
+          {/* 2.5D Filter Bar with Spring Pill */}
           <div className="domus-card flex flex-wrap items-center justify-between gap-3 p-3.5">
-            <div className="flex rounded-xl bg-stone-100 p-1 text-xs font-medium">
+            <div className="flex rounded-xl bg-stone-100 p-1 text-xs font-semibold">
               {(
                 [
                   ["ALL", "All Plans"],
@@ -460,13 +474,24 @@ export default function CalendarView({
                 <button
                   key={key}
                   onClick={() => setModeFilter(key)}
-                  className={`rounded-lg px-3 py-1.5 transition ${
+                  className={`relative rounded-lg px-3 py-1.5 transition-colors ${
                     modeFilter === key
-                      ? "bg-white text-stone-900 shadow-sm"
-                      : "text-stone-600 hover:text-stone-900"
+                      ? "text-stone-900"
+                      : "text-stone-500 hover:text-stone-900"
                   }`}
                 >
-                  {label}
+                  {modeFilter === key && (
+                    <motion.span
+                      layoutId="calendar-mode-pill"
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 30,
+                      }}
+                      className="absolute inset-0 rounded-lg bg-white shadow-sm"
+                    />
+                  )}
+                  <span className="relative z-10">{label}</span>
                 </button>
               ))}
             </div>
@@ -474,21 +499,23 @@ export default function CalendarView({
             <div className="flex flex-wrap items-center gap-1.5">
               <button
                 onClick={() => setMemberFilter("ALL")}
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
                   memberFilter === "ALL"
-                    ? "bg-stone-900 text-white"
-                    : "bg-stone-100 text-stone-600"
+                    ? "bg-stone-900 text-white shadow-sm"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 }`}
               >
                 Everyone
               </button>
               {members.map((m) => (
-                <button
+                <motion.button
                   key={m.id}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={() => setMemberFilter(m.id)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
                     memberFilter === m.id
-                      ? "text-white"
+                      ? "text-white shadow-sm"
                       : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                   }`}
                   style={
@@ -496,12 +523,12 @@ export default function CalendarView({
                   }
                 >
                   {m.name}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
 
-          {/* Events List */}
+          {/* 2.5D Tactile Events List */}
           <div className="space-y-3">
             {loading ? (
               <div className="domus-card p-8 text-center text-sm text-stone-400">
@@ -512,53 +539,56 @@ export default function CalendarView({
                 No calendar blocks match this filter.
               </div>
             ) : (
-              filteredEvents.map((evt) => {
+              filteredEvents.map((evt, idx) => {
                 const owner = memberById.get(evt.ownerId);
                 const removable = canEditOrDeleteEvent(evt, currentMember);
                 return (
-                  <div
+                  <motion.div
                     key={evt.id}
-                    className={`domus-card flex items-start justify-between gap-4 p-4 ${
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.03 }}
+                    className={`domus-card-interactive flex items-start justify-between gap-4 border-l-4 p-4 ${
                       evt.isFamilyOverlap
-                        ? "border-l-4 border-l-terracotta-500"
-                        : "border-l-4 border-l-stone-300"
+                        ? "border-l-terracotta-500"
+                        : "border-l-stone-300"
                     }`}
                   >
                     <div className="min-w-0 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-600">
+                        <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-600">
                           {evt.category}
                         </span>
                         {evt.isFamilyOverlap ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-terracotta-100 px-2 py-0.5 text-[10px] font-semibold text-terracotta-700">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-terracotta-100 px-2 py-0.5 text-[10px] font-bold text-terracotta-700">
                             <Layers className="h-3 w-3" />
                             Overlapping / Shared
                           </span>
                         ) : (
-                          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-500">
+                          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
                             Individual
                           </span>
                         )}
                         {evt.isRedacted && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-semibold text-stone-700">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-700">
                             <Lock className="h-3 w-3" />
                             Private Block
                           </span>
                         )}
                         {evt.hasCollision && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
                             <AlertTriangle className="h-3 w-3" />
                             Schedule Overlap
                           </span>
                         )}
                       </div>
 
-                      <h4 className="text-base font-semibold text-stone-900">
+                      <h4 className="text-base font-bold text-stone-900">
                         {evt.title}
                       </h4>
 
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
-                        <span className="inline-flex items-center gap-1 font-medium text-stone-700">
+                        <span className="inline-flex items-center gap-1 font-semibold text-stone-700">
                           <Clock className="h-3.5 w-3.5" />
                           {formatShortDate(evt.startTime)} ·{" "}
                           {formatTimeRange(evt.startTime, evt.endTime)}
@@ -578,7 +608,7 @@ export default function CalendarView({
                           return (
                             <span
                               key={pid}
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-white"
+                              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm"
                               style={{ backgroundColor: m.color }}
                             >
                               {m.name}
@@ -594,15 +624,17 @@ export default function CalendarView({
                     </div>
 
                     {removable && !evt.isRedacted && (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.12 }}
+                        whileTap={{ scale: 0.92 }}
                         onClick={() => handleDeleteEvent(evt.id)}
                         title="Remove event"
                         className="rounded-lg p-1.5 text-stone-400 transition hover:bg-red-50 hover:text-red-600"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
+                      </motion.button>
                     )}
-                  </div>
+                  </motion.div>
                 );
               })
             )}
@@ -612,11 +644,21 @@ export default function CalendarView({
         {/* Right 5 cols: Book Someone's Time + Bookings Queue */}
         <div className="space-y-6 lg:col-span-5">
           <div className="domus-card p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-terracotta-500" />
-              <h3 className="text-sm font-semibold text-stone-900">
-                Book a Family Member&apos;s Time
-              </h3>
+            <div className="mb-3.5 flex items-center gap-2">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-terracotta-100 text-terracotta-600"
+                style={{ boxShadow: "0 2px 0 0 rgba(212,99,62,0.22)" }}
+              >
+                <UserCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-stone-900">
+                  Book a Family Member&apos;s Time
+                </h3>
+                <p className="text-[11px] text-stone-500">
+                  Conflict-free slots checked automatically
+                </p>
+              </div>
             </div>
 
             {!canBook ? (
@@ -628,7 +670,7 @@ export default function CalendarView({
               <form onSubmit={handleBookTime} className="space-y-3.5">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600">
+                    <label className="mb-1 block text-xs font-semibold text-stone-600">
                       Who do you need?
                     </label>
                     <select
@@ -646,7 +688,7 @@ export default function CalendarView({
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600">
+                    <label className="mb-1 block text-xs font-semibold text-stone-600">
                       Date
                     </label>
                     <input
@@ -660,7 +702,7 @@ export default function CalendarView({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600">
+                    <label className="mb-1 block text-xs font-semibold text-stone-600">
                       Duration
                     </label>
                     <select
@@ -674,7 +716,7 @@ export default function CalendarView({
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600">
+                    <label className="mb-1 block text-xs font-semibold text-stone-600">
                       Activity Type
                     </label>
                     <select
@@ -693,7 +735,7 @@ export default function CalendarView({
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-stone-600">
+                  <label className="mb-1.5 block text-xs font-semibold text-stone-600">
                     Open Conflict-Free Slots ({slots.length} available)
                   </label>
                   {slots.length === 0 ? (
@@ -702,23 +744,30 @@ export default function CalendarView({
                       date or shorter duration.
                     </p>
                   ) : (
-                    <div className="grid max-h-36 grid-cols-2 gap-1.5 overflow-y-auto pr-1">
+                    <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto p-0.5">
                       {slots.map((slot) => {
                         const active =
                           selectedSlot?.startTime === slot.startTime;
                         return (
-                          <button
+                          <motion.button
                             key={slot.startTime}
                             type="button"
+                            whileHover={{ y: -2 }}
+                            whileTap={{ y: 1, scale: 0.97 }}
                             onClick={() => setSelectedSlot(slot)}
-                            className={`rounded-lg border px-2.5 py-1.5 text-left text-xs font-medium transition ${
+                            className={`rounded-xl border px-2.5 py-2 text-left text-xs font-semibold transition ${
                               active
                                 ? "border-terracotta-500 bg-terracotta-50 text-terracotta-700"
-                                : "border-stone-200 bg-stone-50 text-stone-700 hover:bg-white"
+                                : "border-stone-200 bg-white text-stone-700 hover:border-stone-400"
                             }`}
+                            style={{
+                              boxShadow: active
+                                ? "0 3px 0 0 #d4633e"
+                                : "0 2px 0 0 #e6e2d8",
+                            }}
                           >
                             {slot.label}
-                          </button>
+                          </motion.button>
                         );
                       })}
                     </div>
@@ -726,7 +775,7 @@ export default function CalendarView({
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600">
+                  <label className="mb-1 block text-xs font-semibold text-stone-600">
                     What is this time for?
                   </label>
                   <input
@@ -739,7 +788,7 @@ export default function CalendarView({
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600">
+                  <label className="mb-1 block text-xs font-semibold text-stone-600">
                     Notes (optional)
                   </label>
                   <input
@@ -753,7 +802,7 @@ export default function CalendarView({
                 <button
                   type="submit"
                   disabled={!selectedSlot}
-                  className="domus-btn-accent w-full"
+                  className="domus-btn-accent w-full py-2.5"
                 >
                   Send Time-Booking Request
                 </button>
@@ -761,9 +810,9 @@ export default function CalendarView({
             )}
           </div>
 
-          {/* All Bookings History / Queue */}
+          {/* All Bookings Queue */}
           <div className="domus-card p-5">
-            <h3 className="mb-3 text-sm font-semibold text-stone-900">
+            <h3 className="mb-3 text-sm font-bold text-stone-900">
               Household Booking Queue
             </h3>
             <div className="space-y-2.5">
@@ -775,13 +824,14 @@ export default function CalendarView({
                   bk.status === "AWAITING_HEAD_APPROVAL";
 
                 return (
-                  <div
+                  <motion.div
                     key={bk.id}
-                    className="rounded-xl border border-stone-200/80 bg-stone-50/70 p-3"
+                    whileHover={{ y: -2 }}
+                    className="domus-tile p-3.5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-xs font-semibold text-stone-900">
+                        <p className="text-xs font-bold text-stone-900">
                           {bk.title}
                         </p>
                         <p className="text-[11px] text-stone-500">
@@ -791,7 +841,7 @@ export default function CalendarView({
                         </p>
                       </div>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                           bk.status === "ACCEPTED"
                             ? "bg-sage-100 text-sage-700"
                             : bk.status === "DECLINED" ||
@@ -805,11 +855,11 @@ export default function CalendarView({
                     </div>
 
                     {isPending && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
                         {bk.status === "AWAITING_HEAD_APPROVAL" && canApprove && (
                           <button
                             onClick={() => handleBookingAction(bk.id, "APPROVE")}
-                            className="rounded-lg bg-sage-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-sage-700"
+                            className="domus-btn-accent px-2.5 py-1 text-[11px]"
                           >
                             Approve (Head)
                           </button>
@@ -821,7 +871,7 @@ export default function CalendarView({
                               onClick={() =>
                                 handleBookingAction(bk.id, "ACCEPT")
                               }
-                              className="rounded-lg bg-stone-900 px-2.5 py-1 text-[11px] font-medium text-white"
+                              className="domus-btn-primary px-2.5 py-1 text-[11px]"
                             >
                               Accept &amp; Add to Calendar
                             </button>
@@ -830,7 +880,7 @@ export default function CalendarView({
                           canApprove) && (
                           <button
                             onClick={() => handleBookingAction(bk.id, "DECLINE")}
-                            className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-600"
+                            className="domus-btn-secondary px-2.5 py-1 text-[11px]"
                           >
                             Decline
                           </button>
@@ -838,14 +888,14 @@ export default function CalendarView({
                         {bk.requesterId === currentMember.id && (
                           <button
                             onClick={() => handleBookingAction(bk.id, "CANCEL")}
-                            className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-500"
+                            className="domus-btn-secondary px-2.5 py-1 text-[11px]"
                           >
                             Cancel
                           </button>
                         )}
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import {
   Activity,
   CalendarClock,
@@ -13,6 +14,8 @@ import {
   UserCheck,
 } from "lucide-react";
 import { can, MemberContext } from "@/lib/rbac";
+import ProgressRing25D from "./ProgressRing25D";
+import TiltCard from "./TiltCard";
 import {
   ActiveTab,
   CalendarEventDTO,
@@ -119,10 +122,7 @@ export default function DashboardView({
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="h-28 animate-pulse rounded-2xl border border-stone-200 bg-white"
-          />
+          <div key={i} className="domus-card h-32 animate-pulse" />
         ))}
       </div>
     );
@@ -131,24 +131,59 @@ export default function DashboardView({
   const canBook = can(currentMember, "booking:create");
   const canApprove = can(currentMember, "booking:approve_others");
 
+  const kpiCards = [
+    {
+      label: "Overlapping Family Events",
+      value: data.overlappingCount,
+      sub: `of ${data.stats.totalEvents} total household blocks`,
+      icon: <Layers className="h-4 w-4 text-terracotta-600" />,
+      podBg: "bg-terracotta-100",
+      glow: "rgba(212, 99, 62, 0.16)",
+    },
+    {
+      label: "Pending Time Bookings",
+      value: data.stats.pendingBookingsCount,
+      sub: "Awaiting acceptance or Head approval",
+      icon: <Clock className="h-4 w-4 text-amber-700" />,
+      podBg: "bg-amber-100",
+      glow: "rgba(217, 119, 6, 0.16)",
+    },
+    {
+      label: "Active Health & Life Plans",
+      value: data.stats.activeTrackersCount,
+      sub: "Exercise, diet, yoga & driving goals",
+      icon: <Activity className="h-4 w-4 text-sage-700" />,
+      podBg: "bg-sage-100",
+      glow: "rgba(79, 124, 91, 0.18)",
+    },
+    {
+      label: "Open List & Chore Items",
+      value: data.stats.openTasksCount,
+      sub: "Shopping, meal prep & lawn upkeep",
+      icon: <ListChecks className="h-4 w-4 text-stone-800" />,
+      podBg: "bg-stone-200/80",
+      glow: "rgba(25, 23, 20, 0.1)",
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Greeting & KPI strip */}
+      {/* Greeting Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-terracotta-600">
+          <p className="text-xs font-bold uppercase tracking-widest text-terracotta-600">
             Home Pulse
           </p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
             Good day, {currentMember.name}
           </h2>
           <p className="text-sm text-stone-500">
-            Here is what overlaps across your home right now — schedules,
-            requests, wellness, and chores.
+            Live view of what overlaps across your home — schedules, bookings,
+            wellness, and shared chores.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {canBook && (
             <button
               onClick={() => onNavigate("calendar")}
@@ -169,126 +204,123 @@ export default function DashboardView({
       </div>
 
       {actionMessage && (
-        <div className="rounded-xl border border-sage-200 bg-sage-50 px-4 py-2.5 text-sm text-sage-700">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-sage-200 bg-sage-50 px-4 py-2.5 text-sm font-medium text-sage-700"
+        >
           {actionMessage}
-        </div>
+        </motion.div>
       )}
 
-      {/* Stat Cards */}
+      {/* 2.5D Interactive Tilt KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="domus-card p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-stone-500">
-            <span>Overlapping Family Events</span>
-            <Layers className="h-4 w-4 text-terracotta-500" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold text-stone-900">
-            {data.overlappingCount}
-          </p>
-          <p className="mt-0.5 text-xs text-stone-500">
-            of {data.stats.totalEvents} total household blocks
-          </p>
-        </div>
-
-        <div className="domus-card p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-stone-500">
-            <span>Pending Time Bookings</span>
-            <Clock className="h-4 w-4 text-amber-600" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold text-stone-900">
-            {data.stats.pendingBookingsCount}
-          </p>
-          <p className="mt-0.5 text-xs text-stone-500">
-            Awaiting acceptance or Head approval
-          </p>
-        </div>
-
-        <div className="domus-card p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-stone-500">
-            <span>Active Health &amp; Life Plans</span>
-            <Activity className="h-4 w-4 text-sage-600" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold text-stone-900">
-            {data.stats.activeTrackersCount}
-          </p>
-          <p className="mt-0.5 text-xs text-stone-500">
-            Exercise, diet, yoga &amp; driving goals
-          </p>
-        </div>
-
-        <div className="domus-card p-4">
-          <div className="flex items-center justify-between text-xs font-medium text-stone-500">
-            <span>Open List &amp; Chore Items</span>
-            <ListChecks className="h-4 w-4 text-stone-700" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold text-stone-900">
-            {data.stats.openTasksCount}
-          </p>
-          <p className="mt-0.5 text-xs text-stone-500">
-            Shopping, meal prep &amp; lawn upkeep
-          </p>
-        </div>
+        {kpiCards.map((kpi, idx) => (
+          <motion.div
+            key={kpi.label}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: idx * 0.05, type: "spring", stiffness: 280 }}
+          >
+            <TiltCard maxTilt={7} lift={6} glowColor={kpi.glow} className="p-4">
+              <div className="flex items-start justify-between">
+                <span className="text-xs font-semibold text-stone-500">
+                  {kpi.label}
+                </span>
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl ${kpi.podBg}`}
+                  style={{
+                    boxShadow:
+                      "inset 0 1px 0 rgba(255,255,255,0.85), 0 2px 0 0 rgba(0,0,0,0.08)",
+                  }}
+                >
+                  {kpi.icon}
+                </div>
+              </div>
+              <p className="mt-2.5 text-3xl font-bold tracking-tight text-stone-900">
+                {kpi.value}
+              </p>
+              <p className="mt-1 text-xs text-stone-500">{kpi.sub}</p>
+            </TiltCard>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Live Availability Strip */}
+      {/* Live Availability 2.5D Strip */}
       <div className="domus-card p-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-stone-900">
+            <h3 className="text-sm font-bold text-stone-900">
               Who&apos;s Free Right Now
             </h3>
             <p className="text-xs text-stone-500">
-              Live household availability — click Book to request someone&apos;s
-              open time
+              Hover a family tile and click Book Time to reserve an open slot
             </p>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {data.memberAvailability.map((m) => (
-            <div
+          {data.memberAvailability.map((m, idx) => (
+            <motion.div
               key={m.id}
-              className="flex flex-col justify-between rounded-xl border border-stone-200 bg-stone-50/70 p-3"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + idx * 0.04 }}
+              whileHover={{ y: -4 }}
+              className="domus-tile flex flex-col justify-between p-3.5"
             >
               <div className="flex items-center gap-2.5">
                 <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                  style={{ backgroundColor: m.color }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white"
+                  style={{
+                    backgroundColor: m.color,
+                    boxShadow: `0 3px 0 0 ${m.color}88, 0 8px 14px -4px ${m.color}66`,
+                  }}
                 >
                   {m.avatarInitials}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-stone-900">
+                  <p className="truncate text-sm font-bold text-stone-900">
                     {m.name}
                   </p>
                   <span
-                    className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                    className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
                       m.status === "AVAILABLE"
                         ? "text-sage-600"
                         : "text-terracotta-600"
                     }`}
                   >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        m.status === "AVAILABLE"
-                          ? "bg-sage-500"
-                          : "bg-terracotta-500"
-                      }`}
-                    />
-                    {m.status === "AVAILABLE" ? "Free" : "Busy"}
+                    <span className="relative flex h-2 w-2">
+                      <span
+                        className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${
+                          m.status === "AVAILABLE"
+                            ? "bg-sage-400"
+                            : "bg-terracotta-400"
+                        }`}
+                      />
+                      <span
+                        className={`relative inline-flex h-2 w-2 rounded-full ${
+                          m.status === "AVAILABLE"
+                            ? "bg-sage-500"
+                            : "bg-terracotta-500"
+                        }`}
+                      />
+                    </span>
+                    {m.status === "AVAILABLE" ? "Free Now" : "Busy"}
                   </span>
                 </div>
               </div>
-              <p className="mt-2 truncate text-xs text-stone-500">
+              <p className="mt-2.5 truncate text-xs text-stone-500">
                 {m.currentActivity}
               </p>
               {canBook && m.id !== currentMember.id && (
                 <button
                   onClick={() => onNavigate("calendar", m.id)}
-                  className="mt-3 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 transition hover:border-stone-400 hover:text-stone-900"
+                  className="domus-btn-secondary mt-3 w-full py-1.5 text-xs"
                 >
                   Book Time
                 </button>
               )}
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -299,12 +331,12 @@ export default function DashboardView({
         <div className="space-y-6 lg:col-span-7">
           <div className="domus-card p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-stone-900">
+              <h3 className="text-sm font-bold text-stone-900">
                 Household Schedule Snapshot
               </h3>
               <button
                 onClick={() => onNavigate("calendar")}
-                className="text-xs font-medium text-terracotta-600 hover:underline"
+                className="text-xs font-semibold text-terracotta-600 transition hover:translate-x-0.5 hover:underline"
               >
                 Full Common Calendar →
               </button>
@@ -313,25 +345,31 @@ export default function DashboardView({
               {data.todayEvents.map((evt) => {
                 const owner = memberById.get(evt.ownerId);
                 return (
-                  <div
+                  <motion.div
                     key={evt.id}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-stone-200/80 bg-stone-50/50 p-3"
+                    whileHover={{ x: 4, y: -2 }}
+                    transition={{ type: "spring", stiffness: 360, damping: 24 }}
+                    className={`domus-tile flex items-start justify-between gap-3 border-l-4 p-3.5 ${
+                      evt.isFamilyOverlap
+                        ? "border-l-terracotta-500"
+                        : "border-l-stone-300"
+                    }`}
                   >
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         {evt.isRedacted && (
                           <Lock className="h-3.5 w-3.5 text-stone-400" />
                         )}
-                        <p className="text-sm font-semibold text-stone-900">
+                        <p className="text-sm font-bold text-stone-900">
                           {evt.title}
                         </p>
                         {evt.isFamilyOverlap && (
-                          <span className="rounded-full bg-terracotta-100 px-2 py-0.5 text-[10px] font-semibold text-terracotta-700">
+                          <span className="rounded-full bg-terracotta-100 px-2 py-0.5 text-[10px] font-bold text-terracotta-700">
                             Shared Overlap
                           </span>
                         )}
                         {evt.hasCollision && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
                             Conflict
                           </span>
                         )}
@@ -342,7 +380,7 @@ export default function DashboardView({
                         {evt.location ? ` · ${evt.location}` : ""}
                       </p>
                     </div>
-                    <div className="flex shrink-0 -space-x-1.5">
+                    <div className="flex shrink-0 -space-x-1.5 transition-all hover:space-x-0.5">
                       {evt.participantIds.map((pid) => {
                         const pm = memberById.get(pid);
                         if (!pm) return null;
@@ -350,7 +388,7 @@ export default function DashboardView({
                           <span
                             key={pid}
                             title={pm.name}
-                            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-semibold text-white"
+                            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-sm transition-transform hover:-translate-y-0.5"
                             style={{ backgroundColor: pm.color }}
                           >
                             {pm.avatarInitials}
@@ -359,14 +397,14 @@ export default function DashboardView({
                       })}
                       {evt.participantIds.length === 0 && owner && (
                         <span
-                          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-semibold text-white"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-sm"
                           style={{ backgroundColor: owner.color }}
                         >
                           {owner.avatarInitials}
                         </span>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -377,11 +415,11 @@ export default function DashboardView({
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <UserCheck className="h-4 w-4 text-terracotta-500" />
-                <h3 className="text-sm font-semibold text-stone-900">
+                <h3 className="text-sm font-bold text-stone-900">
                   Time-Booking Requests
                 </h3>
               </div>
-              <span className="text-xs text-stone-400">
+              <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-stone-500">
                 {data.pendingBookings.length} active
               </span>
             </div>
@@ -401,18 +439,19 @@ export default function DashboardView({
                     bk.status === "AWAITING_HEAD_APPROVAL";
 
                   return (
-                    <div
+                    <motion.div
                       key={bk.id}
-                      className="rounded-xl border border-stone-200 bg-stone-50/70 p-3.5"
+                      whileHover={{ y: -2 }}
+                      className="domus-tile p-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-stone-900">
+                            <p className="text-sm font-bold text-stone-900">
                               {bk.title}
                             </p>
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                 needsHeadApproval
                                   ? "bg-amber-100 text-amber-800"
                                   : "bg-stone-200 text-stone-700"
@@ -440,7 +479,7 @@ export default function DashboardView({
                           {needsHeadApproval && canApprove && (
                             <button
                               onClick={() => respondBooking(bk.id, "APPROVE")}
-                              className="rounded-lg bg-sage-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-sage-700"
+                              className="domus-btn-accent px-3 py-1.5 text-xs"
                             >
                               Approve
                             </button>
@@ -448,7 +487,7 @@ export default function DashboardView({
                           {!needsHeadApproval && canRespond && (
                             <button
                               onClick={() => respondBooking(bk.id, "ACCEPT")}
-                              className="rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-stone-800"
+                              className="domus-btn-primary px-3 py-1.5 text-xs"
                             >
                               Accept
                             </button>
@@ -456,14 +495,14 @@ export default function DashboardView({
                           {canRespond && (
                             <button
                               onClick={() => respondBooking(bk.id, "DECLINE")}
-                              className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100"
+                              className="domus-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Decline
                             </button>
                           )}
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -471,19 +510,19 @@ export default function DashboardView({
           </div>
         </div>
 
-        {/* Right: Trackers + Priority Tasks */}
+        {/* Right: Trackers with 2.5D Rings + Priority Tasks */}
         <div className="space-y-6 lg:col-span-5">
           <div className="domus-card p-5">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-sage-600" />
-                <h3 className="text-sm font-semibold text-stone-900">
+                <h3 className="text-sm font-bold text-stone-900">
                   Exercise, Diet &amp; Life Plans
                 </h3>
               </div>
               <button
                 onClick={() => onNavigate("trackers")}
-                className="text-xs font-medium text-sage-600 hover:underline"
+                className="text-xs font-semibold text-sage-600 hover:underline"
               >
                 Log progress →
               </button>
@@ -502,31 +541,28 @@ export default function DashboardView({
                   );
                   const owner = memberById.get(trk.memberId);
                   return (
-                    <div key={trk.id} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-stone-800">
+                    <motion.div
+                      key={trk.id}
+                      whileHover={{ x: 3 }}
+                      onClick={() => onNavigate("trackers")}
+                      className="domus-tile flex cursor-pointer items-center gap-3.5 p-3"
+                    >
+                      <ProgressRing25D
+                        percent={pct}
+                        color={owner?.color ?? "#4f7c5b"}
+                        size={48}
+                        strokeWidth={5}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold text-stone-900">
                           {trk.title}
-                        </span>
-                        <span className="text-stone-500">
-                          {trk.currentValue}/{trk.targetValue} {trk.unit}
-                        </span>
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-stone-500">
+                          {owner?.name} · {trk.currentValue}/{trk.targetValue}{" "}
+                          {trk.unit}
+                        </p>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-stone-100">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: owner?.color ?? "#4f7c5b",
-                          }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-stone-400">
-                        <span>
-                          {owner?.name} · {trk.category}
-                        </span>
-                        <span>{pct}%</span>
-                      </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -535,12 +571,12 @@ export default function DashboardView({
 
           <div className="domus-card p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-stone-900">
+              <h3 className="text-sm font-bold text-stone-900">
                 Up Next: Shopping, Meal Prep &amp; Chores
               </h3>
               <button
                 onClick={() => onNavigate("lists")}
-                className="text-xs font-medium text-stone-600 hover:underline"
+                className="text-xs font-semibold text-stone-600 hover:underline"
               >
                 View all →
               </button>
@@ -551,15 +587,17 @@ export default function DashboardView({
                   ? memberById.get(item.assigneeId)
                   : null;
                 return (
-                  <button
+                  <motion.button
                     key={item.id}
+                    whileHover={{ x: 4, y: -1 }}
+                    whileTap={{ scale: 0.985 }}
                     onClick={() => toggleQuickTask(item)}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-stone-200/70 bg-stone-50/60 px-3 py-2 text-left transition hover:bg-white"
+                    className="domus-tile flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left"
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-stone-300" />
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-stone-300 transition-colors hover:text-sage-600" />
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-stone-800">
+                        <p className="truncate text-xs font-semibold text-stone-800">
                           {item.title}
                         </p>
                         <p className="text-[11px] text-stone-400">
@@ -570,13 +608,13 @@ export default function DashboardView({
                     </div>
                     {assignee && (
                       <span
-                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                        className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm"
                         style={{ backgroundColor: assignee.color }}
                       >
                         {assignee.name}
                       </span>
                     )}
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
