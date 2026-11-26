@@ -21,9 +21,11 @@ import {
   X,
 } from "lucide-react";
 import { AVATAR_PRESETS } from "@/lib/avatars";
+import { CLAY_MINIATURES, getMiniatureByIdOrSrc } from "@/lib/miniatures";
 import { MemberContext, ROLE_META, Role } from "@/lib/rbac";
 import FamilyCalendarPanel from "./FamilyCalendarPanel";
 import MemberAvatar from "./MemberAvatar";
+import MiniaturePicker from "./MiniaturePicker";
 import type {
   CalendarEventDTO,
   HouseholdDTO,
@@ -42,28 +44,8 @@ interface CommonAreaViewProps {
   onOpenWallPaint: () => void;
 }
 
-const LIST_ICON_OPTIONS = [
-  { id: "groceries", label: "Groceries", src: "/assets/decor-groceries.png" },
-  { id: "meals", label: "Meal Prep", src: "/assets/decor-salad.png" },
-  { id: "fitness", label: "Fitness", src: "/assets/decor-weights.png" },
-  { id: "errands", label: "Errands", src: "/assets/decor-car.png" },
-  { id: "home", label: "Home Care", src: "/assets/decor-toolbox.png" },
-  { id: "plants", label: "Garden", src: "/assets/decor-plant.png" },
-  { id: "coffee", label: "Treats", src: "/assets/decor-coffee.png" },
-  { id: "pets", label: "Pets", src: "/assets/decor-cat.png" },
-  { id: "general", label: "General", src: "/assets/board-3d.png" },
-];
-
 function getListIconSrc(type: string): string {
-  if (type.startsWith("/assets/")) return type;
-  const found = LIST_ICON_OPTIONS.find(
-    (opt) => opt.id.toUpperCase() === type.toUpperCase()
-  );
-  if (found) return found.src;
-  if (type === "SHOPPING") return "/assets/decor-groceries.png";
-  if (type === "MEAL_PREP") return "/assets/decor-salad.png";
-  if (type === "CHORES") return "/assets/decor-toolbox.png";
-  return "/assets/board-3d.png";
+  return getMiniatureByIdOrSrc(type)?.src ?? "/assets/board-3d.png";
 }
 
 export default function CommonAreaView({
@@ -764,48 +746,21 @@ export default function CommonAreaView({
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-bold text-[#6b5d53]">
-                    Quick Pick or Icon (Optional)
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {LIST_ICON_OPTIONS.map((opt) => {
-                      const selected = newListIcon === opt.src;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            setNewListIcon(opt.src);
-                            const presetLabels = LIST_ICON_OPTIONS.map(
-                              (o) => o.label
-                            );
-                            if (
-                              !newListTitle.trim() ||
-                              presetLabels.includes(newListTitle.trim())
-                            ) {
-                              setNewListTitle(opt.label);
-                            }
-                          }}
-                          className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-bold transition ${
-                            selected
-                              ? "border-[#1f332b] bg-[#1f332b] text-white shadow-sm"
-                              : "border-transparent bg-[#f3ede4] text-[#5c5047] hover:bg-[#eae0d3]"
-                          }`}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={opt.src}
-                            alt={opt.label}
-                            className="h-4 w-4 rounded object-contain"
-                          />
-                          {opt.label}
-                          {selected && <Check className="h-3 w-3" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <MiniaturePicker
+                  value={newListIcon}
+                  label="Quick Pick or 2.5D Icon (20 Miniatures)"
+                  compactCount={8}
+                  onSelect={(mini) => {
+                    setNewListIcon(mini.src);
+                    const presetLabels = CLAY_MINIATURES.map((o) => o.label);
+                    if (
+                      !newListTitle.trim() ||
+                      presetLabels.includes(newListTitle.trim())
+                    ) {
+                      setNewListTitle(mini.label);
+                    }
+                  }}
+                />
               </motion.form>
             )}
           </AnimatePresence>

@@ -16,8 +16,10 @@ import {
   X,
 } from "lucide-react";
 import { getPublicHolidaysForYear } from "@/lib/holidays";
+import { getMiniatureByIdOrSrc } from "@/lib/miniatures";
 import type { MemberContext } from "@/lib/rbac";
 import MemberAvatar from "./MemberAvatar";
+import MiniaturePicker from "./MiniaturePicker";
 import type { CalendarEventDTO, HouseholdListDTO, MemberDTO } from "./types";
 
 interface FamilyCalendarPanelProps {
@@ -45,6 +47,7 @@ interface UnifiedCalEntry {
   location?: string;
   notes?: string;
   listTitle?: string;
+  iconSrc?: string;
 }
 
 function toDateKey(d: Date): string {
@@ -117,6 +120,7 @@ export default function FamilyCalendarPanel({
     currentMember.id,
   ]);
   const [eventLocation, setEventLocation] = useState("");
+  const [eventIconId, setEventIconId] = useState("");
   const [eventNotes, setEventNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -135,6 +139,7 @@ export default function FamilyCalendarPanel({
     setEventTitle("");
     setEventCategory("FAMILY");
     setEventLocation("");
+    setEventIconId("");
     setEventNotes("");
     setFormError(null);
     setParticipantIds([currentMember.id]);
@@ -208,7 +213,9 @@ export default function FamilyCalendarPanel({
           participantIds: involved,
           visibility: isPersonal ? "PRIVATE" : "FAMILY",
           isShared: !isPersonal && (involved.length > 1 || eventCategory !== "FAMILY"),
-          location: eventLocation.trim(),
+          location: eventIconId
+            ? `icon:${eventIconId}`
+            : eventLocation.trim(),
           notes: eventNotes.trim(),
         }),
       });
@@ -287,6 +294,11 @@ export default function FamilyCalendarPanel({
         ? `${displayYear}-${start.dateKey.slice(5, 10)}`
         : start.dateKey;
 
+      const isIconLoc = Boolean(ev.location?.startsWith("icon:"));
+      const iconMini = isIconLoc
+        ? getMiniatureByIdOrSrc(ev.location?.slice(5))
+        : null;
+
       push({
         id: ev.id,
         eventId: ev.id,
@@ -301,8 +313,9 @@ export default function FamilyCalendarPanel({
           : `${formatHourShort(start.hour)} – ${formatHourShort(end.hour)}`,
         participantIds: involved,
         ownerId: ev.ownerId,
-        location: ev.location,
+        location: isIconLoc ? "" : ev.location,
         notes: ev.notes,
+        iconSrc: iconMini?.src,
       });
     }
 
@@ -902,7 +915,16 @@ export default function FamilyCalendarPanel({
                       className="space-y-1.5 rounded-2xl bg-[#f3ede4] p-3.5"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          {entry.iconSrc && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={entry.iconSrc}
+                              alt=""
+                              className="mt-0.5 h-8 w-8 shrink-0 object-contain mix-blend-multiply"
+                            />
+                          )}
+                          <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
                               className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
@@ -933,6 +955,7 @@ export default function FamilyCalendarPanel({
                           <p className="mt-1 text-sm font-extrabold text-[#1e1916]">
                             {entry.title}
                           </p>
+                          </div>
                         </div>
 
                         {entry.eventId && (
@@ -1227,6 +1250,15 @@ export default function FamilyCalendarPanel({
                   </p>
                 </div>
               )}
+
+              <MiniaturePicker
+                value={eventIconId}
+                label="2.5D Icon Badge (Optional)"
+                compactCount={5}
+                onSelect={(mini) =>
+                  setEventIconId((prev) => (prev === mini.id ? "" : mini.id))
+                }
+              />
 
               <div>
                 <label className="mb-1 block text-xs font-bold text-[#4e433b]">

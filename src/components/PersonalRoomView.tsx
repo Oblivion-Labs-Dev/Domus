@@ -18,10 +18,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { getMiniatureByIdOrSrc } from "@/lib/miniatures";
 import type { MemberContext } from "@/lib/rbac";
 import AvatarEditorModal from "./AvatarEditorModal";
 import FamilyCalendarPanel from "./FamilyCalendarPanel";
 import MemberAvatar from "./MemberAvatar";
+import MiniaturePicker from "./MiniaturePicker";
 import ProgressRing25D from "./ProgressRing25D";
 import type {
   BoardCardDTO,
@@ -81,6 +83,7 @@ export default function PersonalRoomView({
   const [trkType, setTrkType] = useState<"EXERCISE" | "DIET" | "LIFE_PLAN">(
     "EXERCISE"
   );
+  const [trkIconId, setTrkIconId] = useState("weights");
   const [trkUnit, setTrkUnit] = useState("sessions");
   const [trkTarget, setTrkTarget] = useState(5);
 
@@ -306,7 +309,7 @@ export default function PersonalRoomView({
       body: JSON.stringify({
         title: trkTitle.trim(),
         type: trkType,
-        category: trkType === "LIFE_PLAN" ? "Life Plan" : trkType,
+        category: trkIconId,
         unit: trkUnit.trim() || "sessions",
         targetValue: Number(trkTarget) || 5,
         cadence: "WEEKLY",
@@ -780,6 +783,14 @@ export default function PersonalRoomView({
                     className="domus-input py-1.5 text-xs"
                   />
                 </div>
+                <div className="sm:col-span-12">
+                  <MiniaturePicker
+                    value={trkIconId}
+                    label="Pick a 2.5D Icon for this Goal"
+                    compactCount={6}
+                    onSelect={(mini) => setTrkIconId(mini.id)}
+                  />
+                </div>
                 <div className="flex justify-end gap-2 sm:col-span-12">
                   <button
                     type="button"
@@ -810,15 +821,26 @@ export default function PersonalRoomView({
                     100,
                     Math.round((t.currentValue / Math.max(1, t.targetValue)) * 100)
                   );
+                  const goalIcon =
+                    getMiniatureByIdOrSrc(t.category) ??
+                    getMiniatureByIdOrSrc(t.type);
                   return (
                     <div
                       key={t.id}
                       className="flex items-center justify-between gap-3 rounded-2xl bg-[#f3ede4] p-3"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
+                        {goalIcon && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={goalIcon.src}
+                            alt={goalIcon.label}
+                            className="h-9 w-9 shrink-0 object-contain mix-blend-multiply"
+                          />
+                        )}
                         <ProgressRing25D
                           percent={pct}
-                          size={46}
+                          size={44}
                           color={
                             t.type === "EXERCISE"
                               ? "#d45a33"
