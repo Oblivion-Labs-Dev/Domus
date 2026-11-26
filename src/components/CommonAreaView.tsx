@@ -1,13 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Cake,
   Calendar as CalendarIcon,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   DoorClosed,
   DoorOpen,
@@ -18,14 +15,13 @@ import {
   ListChecks,
   Plus,
   Send,
-  Sparkles,
   Trash2,
   UserPlus,
   X,
 } from "lucide-react";
 import { AVATAR_PRESETS } from "@/lib/avatars";
-import { getPublicHolidaysForYear } from "@/lib/holidays";
 import { MemberContext, ROLE_META, Role } from "@/lib/rbac";
+import FamilyCalendarPanel from "./FamilyCalendarPanel";
 import MemberAvatar from "./MemberAvatar";
 import type {
   CalendarEventDTO,
@@ -67,10 +63,6 @@ function getListIconSrc(type: string): string {
   if (type === "MEAL_PREP") return "/assets/decor-salad.png";
   if (type === "CHORES") return "/assets/decor-toolbox.png";
   return "/assets/board-3d.png";
-}
-
-function toDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function CommonAreaView({
@@ -133,20 +125,6 @@ export default function CommonAreaView({
     roomKey: string;
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  // Family Calendar UI
-  const [calCursor, setCalCursor] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
-  const [eventModalOpen, setEventModalOpen] = useState(false);
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventDate, setEventDate] = useState(() => toDateKey(new Date()));
-  const [eventCategory, setEventCategory] = useState<
-    "FAMILY" | "BIRTHDAY" | "HOLIDAY"
-  >("FAMILY");
-  const [eventNotes, setEventNotes] = useState("");
-  const [eventSaving, setEventSaving] = useState(false);
 
   const canInvite =
     currentMember.role === "HEAD" || currentMember.role === "CO_HEAD";
@@ -452,135 +430,6 @@ export default function CommonAreaView({
       // ignore
     }
   }
-
-  // --- Calendar Actions ---
-  async function handleSaveCalendarItem(e: React.FormEvent) {
-    e.preventDefault();
-    if (!eventTitle.trim() || !eventDate) return;
-    setEventSaving(true);
-    try {
-      const startTime = `${eventDate}T09:00:00.000Z`;
-      const endTime = `${eventDate}T10:00:00.000Z`;
-      const res = await fetch("/api/calendar/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: eventTitle.trim(),
-          category: eventCategory,
-          startTime,
-          endTime,
-          visibility: "FAMILY",
-          isShared: true,
-          notes: eventNotes.trim(),
-        }),
-      });
-      if (res.ok) {
-        setEventTitle("");
-        setEventNotes("");
-        setEventModalOpen(false);
-        await loadAll();
-      }
-    } finally {
-      setEventSaving(false);
-    }
-  }
-
-  // Build unified calendar entries for the currently displayed month
-  const calendarYear = calCursor.getFullYear();
-  const calendarMonth = calCursor.getMonth();
-
-  const monthDays = useMemo(() => {
-    const firstDay = new Date(calendarYear, calendarMonth, 1);
-    const startOffset = firstDay.getDay();
-    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-    const cells: Array<{ date: Date | null; key: string }> = [];
-    for (let i = 0; i < startOffset; i++) {
-      cells.push({ date: null, key: `empty-${i}` });
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dt = new Date(calendarYear, calendarMonth, d);
-      cells.push({ date: dt, key: toDateKey(dt) });
-    }
-    return cells;
-  }, [calendarYear, calendarMonth]);
-
-  const entriesByDate = useMemo(() => {
-    const map: Record<
-      string,
-      Array<{
-        id: string;
-        title: string;
-        kind: "HOLIDAY" | "BIRTHDAY" | "EVENT" | "LIST_ITEM";
-      }>
-    > = {};
-
-    const push = (
-      dateKey: string,
-      entry: {
-        id: string;
-        title: string;
-        kind: "HOLIDAY" | "BIRTHDAY" | "EVENT" | "LIST_ITEM";
-      }
-    ) => {
-      if (!map[dateKey]) map[dateKey] = [];
-      map[dateKey].push(entry);
-    };
-
-    // 1. Public holidays for displayed year
-    for (const h of getPublicHolidaysForYear(calendarYear)) {
-      push(h.date, {
-        id: `hol-${h.date}-${h.title}`,
-        title: h.title,
-        kind: "HOLIDAY",
-      });
-    }
-
-    // 2. Saved family events & birthdays (birthdays automatically recur every year!)
-    for (const ev of events) {
-      const rawDate = ev.startTime.slice(0, 10);
-      if (ev.category === "BIRTHDAY") {
-        const recurringKey = `${calendarYear}-${rawDate.slice(5, 10)}`;
-        push(recurringKey, {
-          id: ev.id,
-          title: ev.title,
-          kind: "BIRTHDAY",
-        });
-      } else {
-        push(rawDate, {
-          id: ev.id,
-          title: ev.title,
-          kind: ev.category === "HOLIDAY" ? "HOLIDAY" : "EVENT",
-        });
-      }
-    }
-
-    // 3. Any shared list item with a date automatically appears on the Family Calendar!
-    for (const list of lists) {
-      for (const item of list.items) {
-        if (item.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)) {
-          const isBirthday =
-            /birthday|bday/i.test(item.title) ||
-            /birthday|bday/i.test(list.title);
-          const dateKey = isBirthday
-            ? `${calendarYear}-${item.dueDate.slice(5, 10)}`
-            : item.dueDate;
-          push(dateKey, {
-            id: `li-${item.id}`,
-            title: item.title,
-            kind: isBirthday ? "BIRTHDAY" : "LIST_ITEM",
-          });
-        }
-      }
-    }
-
-    return map;
-  }, [calendarYear, events, lists]);
-
-  const todayKey = toDateKey(new Date());
-  const monthLabel = calCursor.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
 
   const pendingIncomingCount = incomingKnocks.filter(
     (k) => k.status === "KNOCKING"
@@ -1078,184 +927,14 @@ export default function CommonAreaView({
           )}
         </section>
 
-        {/* RIGHT 5 COLS: COMPACT STICKY FAMILY CALENDAR (FITS IN VIEWPORT) */}
-        <section className="domus-card p-4 sm:p-5 lg:sticky lg:top-20 lg:col-span-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/assets/calendar-3d.png"
-                alt="Family Calendar"
-                className="h-8 w-8 shrink-0 object-contain mix-blend-multiply"
-              />
-              <div>
-                <h2 className="text-base font-extrabold leading-tight tracking-tight text-[#1e1916]">
-                  Family Calendar
-                </h2>
-                <p className="text-[10px] text-[#6b5d53]">
-                  Holidays, birthdays &amp; dated list items
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setEventDate(todayKey);
-                setEventCategory("BIRTHDAY");
-                setEventTitle("");
-                setEventNotes("");
-                setEventModalOpen(true);
-              }}
-              className="domus-btn-accent px-3 py-1.5 text-[11px]"
-            >
-              <Plus className="h-3 w-3" />
-              Add
-            </button>
-          </div>
-
-          {/* Month Controls + Legend */}
-          <div className="mb-2.5 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1 rounded-xl bg-[#f3ede4] p-0.5">
-              <button
-                type="button"
-                onClick={() =>
-                  setCalCursor(new Date(calendarYear, calendarMonth - 1, 1))
-                }
-                className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <span className="min-w-[112px] text-center text-xs font-extrabold text-[#1e1916]">
-                {monthLabel}
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setCalCursor(new Date(calendarYear, calendarMonth + 1, 1))
-                }
-                className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date();
-                setCalCursor(new Date(now.getFullYear(), now.getMonth(), 1));
-              }}
-              className="domus-btn-secondary px-2.5 py-1 text-[11px]"
-            >
-              Today
-            </button>
-          </div>
-
-          <div className="mb-2 flex flex-wrap items-center gap-2.5 text-[10px] font-semibold text-[#6b5d53]">
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-sky-500" />
-              Holiday
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-rose-500" />
-              Birthday
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-sage-600" />
-              Event
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-              List
-            </span>
-          </div>
-
-          {/* Compact Month Grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {["S", "M", "T", "W", "T", "F", "S"].map((day, idx) => (
-              <div
-                key={`${day}-${idx}`}
-                className="py-1 text-center text-[10px] font-bold uppercase text-[#7c6e63]"
-              >
-                {day}
-              </div>
-            ))}
-
-            {monthDays.map((cell) => {
-              if (!cell.date) {
-                return (
-                  <div
-                    key={cell.key}
-                    className="min-h-[54px] rounded-xl bg-[#f3ede4]/35"
-                  />
-                );
-              }
-
-              const dayEntries = entriesByDate[cell.key] ?? [];
-              const isToday = cell.key === todayKey;
-
-              return (
-                <button
-                  key={cell.key}
-                  type="button"
-                  onClick={() => {
-                    setEventDate(cell.key);
-                    setEventCategory("FAMILY");
-                    setEventTitle("");
-                    setEventNotes("");
-                    setEventModalOpen(true);
-                  }}
-                  title={
-                    dayEntries.length > 0
-                      ? dayEntries.map((e) => e.title).join(" · ")
-                      : `Add to ${cell.key}`
-                  }
-                  className={`flex min-h-[54px] flex-col items-start gap-0.5 rounded-xl p-1 text-left transition ${
-                    isToday
-                      ? "bg-terracotta-50 ring-2 ring-terracotta-500"
-                      : "bg-[#f3ede4]/75 hover:bg-[#ece3d6]"
-                  }`}
-                >
-                  <span
-                    className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
-                      isToday
-                        ? "bg-terracotta-500 text-white"
-                        : "text-[#3d342e]"
-                    }`}
-                  >
-                    {cell.date.getDate()}
-                  </span>
-
-                  <div className="w-full space-y-0.5">
-                    {dayEntries.slice(0, 2).map((entry) => (
-                      <div
-                        key={entry.id}
-                        className={`truncate rounded px-1 py-0.5 text-[9px] font-bold leading-none ${
-                          entry.kind === "HOLIDAY"
-                            ? "bg-sky-100 text-sky-900"
-                            : entry.kind === "BIRTHDAY"
-                            ? "bg-rose-100 text-rose-900"
-                            : entry.kind === "LIST_ITEM"
-                            ? "bg-amber-100 text-amber-900"
-                            : "bg-sage-100 text-sage-900"
-                        }`}
-                      >
-                        {entry.kind === "BIRTHDAY" ? "🎂 " : ""}
-                        {entry.title}
-                      </div>
-                    ))}
-                    {dayEntries.length > 2 && (
-                      <p className="px-0.5 text-[9px] font-bold text-[#6b5d53]">
-                        +{dayEntries.length - 2}
-                      </p>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        {/* RIGHT 5 COLS: MULTI-VIEW FAMILY & PERSONAL CALENDAR (Month | Week | Day + Day Detail Sheet + Participant Sync) */}
+        <FamilyCalendarPanel
+          currentMember={currentMember}
+          members={members}
+          events={events}
+          lists={lists}
+          onRefresh={loadAll}
+        />
       </div>
 
       {/* MODAL 1: KNOCK ON A FAMILY MEMBER'S DOOR (Quiet Knock OR With Message) */}
@@ -1561,140 +1240,6 @@ export default function CommonAreaView({
         )}
       </AnimatePresence>
 
-      {/* MODAL 3: ADD EVENT OR BIRTHDAY TO FAMILY CALENDAR */}
-      <AnimatePresence>
-        {eventModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setEventModalOpen(false)}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
-          >
-            <motion.form
-              initial={{ opacity: 0, scale: 0.94, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              onClick={(e) => e.stopPropagation()}
-              onSubmit={handleSaveCalendarItem}
-              className="domus-card relative w-full max-w-md space-y-4 p-6 sm:p-7"
-            >
-              <button
-                type="button"
-                onClick={() => setEventModalOpen(false)}
-                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] hover:bg-[#e5d9ca]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div>
-                <h3 className="text-base font-extrabold text-[#1e1916]">
-                  Add to Family Calendar
-                </h3>
-                <p className="mt-0.5 text-xs text-[#6b5d53]">
-                  Save a birthday (recurs every year), holiday, or family plan.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    {
-                      id: "BIRTHDAY",
-                      label: "Birthday",
-                      icon: <Cake className="h-3.5 w-3.5" />,
-                    },
-                    {
-                      id: "FAMILY",
-                      label: "Family Plan",
-                      icon: <CalendarIcon className="h-3.5 w-3.5" />,
-                    },
-                    {
-                      id: "HOLIDAY",
-                      label: "Holiday",
-                      icon: <Sparkles className="h-3.5 w-3.5" />,
-                    },
-                  ] as const
-                ).map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setEventCategory(cat.id)}
-                    className={`flex items-center justify-center gap-1.5 rounded-2xl py-2.5 text-xs font-bold transition ${
-                      eventCategory === cat.id
-                        ? "bg-[#1f332b] text-white shadow-sm"
-                        : "bg-[#f3ede4] text-[#5c5047] hover:bg-[#e8dfd3]"
-                    }`}
-                  >
-                    {cat.icon}
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                  Title <span className="text-terracotta-500">*</span>
-                </label>
-                <input
-                  autoFocus
-                  required
-                  value={eventTitle}
-                  onChange={(e) => setEventTitle(e.target.value)}
-                  placeholder={
-                    eventCategory === "BIRTHDAY"
-                      ? "e.g., Aunt Priya's Birthday"
-                      : "e.g., Sunday Family Dinner"
-                  }
-                  className="domus-input"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                  Date <span className="text-terracotta-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                  className="domus-input"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                  Notes (Optional)
-                </label>
-                <input
-                  value={eventNotes}
-                  onChange={(e) => setEventNotes(e.target.value)}
-                  placeholder="Gift ideas, time, location..."
-                  className="domus-input"
-                />
-              </div>
-
-              <div className="flex gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setEventModalOpen(false)}
-                  className="domus-btn-secondary flex-1 py-2.5 text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={eventSaving}
-                  className="domus-btn-accent flex-1 py-2.5 text-xs"
-                >
-                  {eventSaving ? "Saving..." : "Save to Calendar"}
-                </button>
-              </div>
-            </motion.form>
-          </motion.div>
-        )}
-      </AnimatePresence>
       {/* FLOATING ROUNDED DRAG PILL (smooth, rounded, never square!) */}
       {pointerDrag && (
         <div

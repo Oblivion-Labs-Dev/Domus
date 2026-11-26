@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { calendarEvents, houseResources } from "@/db/schema";
 import { getCurrentMember } from "@/lib/auth";
@@ -61,7 +61,10 @@ export async function POST(request: Request) {
       ? body.resourceId
       : null;
 
-  const participants = Array.from(new Set([actor.id, ...data.participantIds]));
+  const participants =
+    data.participantIds.length > 0
+      ? Array.from(new Set(data.participantIds))
+      : [actor.id];
   const wantsShared = data.isShared || participants.length > 1;
 
   if (wantsShared && !can(actor, "calendar:create_shared")) {
@@ -133,4 +136,49 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ id }, { status: 201 });
+}
+
+export async function DELETE(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Event id required" }, { status: 400 });
+  }
+  const rows = await db
+    .select()
+    .from(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.id, id),
+        eq(calendarEvents.householdId, actor.householdId)
+      )
+    )
+    .limit(1);
+  const ev = rows[0];
+  if (!ev) {
+    return NextResponse.json({ error: "Event not found" }, { status: 404 });
+  }
+  if (
+    ev.ownerId !== actor.id &&
+    actor.role !== "HEAD" &&
+    actor.role !== "CO_HEAD"
+  ) {
+    return NextResponse.json(
+      { error: "Only the event creator or Head of Household can delete this." },
+      { status: 403 }
+    );
+  }
+  await db
+    .delete(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.id, id),
+        eq(calendarEvents.householdId, actor.householdId)
+      )
+    );
+  return NextResponse.json({ ok: true });
 }
