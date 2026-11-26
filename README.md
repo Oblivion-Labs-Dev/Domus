@@ -1,122 +1,73 @@
 # Domus
 
-**A lightweight, architectural operating hub for real households.**
+**A digital twin of a real house — shared living room boards, private customizable rooms, universal Knock-to-Visit privacy, House Gear conflict prevention, and a Daily/Weekly/Yearly family calendar.**
 
-Domus brings your entire family's overlapping and individual lives into one fast, purpose-built workspace: a shared calendar with **time-booking**, **exercise, diet & lifestyle trackers** (yoga, driving lessons, workouts, nutrition), **shared household lists** (shopping, meal prep, lawn mowing, chores), and **real family roles & permissions** anchored by a Head of Household.
-
-> Lighter than Notion (zero setup overhead, opinionated home primitives). Richer than Google Calendar (built for household overlap, time-booking, health routines, and shared execution).
+> Lighter and more personal than Notion. Deeper and more home-native than Google Calendar.
 
 ---
 
-## Why Domus?
+## Core Architecture: The "Real House" Model
 
-| Problem with generic tools | How Domus solves it |
-|---|---|
-| **Notion** is too heavy and slow for quick daily family use | Instant, purpose-built views: Home Pulse, Common Calendar, Trackers, and Household Lists — zero manual database building |
-| **Google Calendar** only tracks events — no chores, diet, or booking friction | Combines **overlapping & individual schedules** with a **Time-Booking Engine**, **Exercise/Diet/Life Trackers**, and **Actionable Lists** |
-| **No real household governance** | First-class RBAC with **Head of Household**, **Co-Head**, **Member**, **Junior**, and **Guest** roles, privacy redaction, and booking approvals |
+Domus is organized like an actual home instead of generic productivity tabs:
 
----
+1. **Common Area *(Shared Living Room)***
+   - **Drag-and-Drop House Board**: Create custom columns, pin colored 2.5D sticky notes & task cards, tag priorities, and **Pick Up** unclaimed house chores (e.g., *Mow Front & Back Lawn*, *Costco Run*) with 1 click — automatically assigning them to you and syncing them into your Personal Room.
+   - **Auto-Calendar Sync**: Adding a date/time to any board card automatically places it on the Calendar.
+   - **Shared House Gear**: Attach shared resources (`Family Car (CR-V)`, `Lawn Mower`, `Home Gym`, `Kitchen Oven`) to any card or calendar block — the Overlap Engine prevents double-booking automatically.
+   - **2.5D Decor Studio**: Customize wall themes and place/remove 2.5D matte-clay miniature assets (`Monstera Pot`, `Studio Lamp`, `Yoga Mat`, `Market Tote`, `Family SUV`, `Lawn Mower`).
+   - **Shared Checklists**: Collapsible Shopping, Sunday Meal Prep, and Home Chore lists.
 
-## Core Features (MVP)
+2. **My Room *(Private, Flexible Personal Space)***
+   - **Universal Knock-to-Visit Privacy**: Nobody can peek into another member's room by default — not even the Head of Household. Visitors knock with a personal message, and the room owner can **Let In**, **Decline**, or **Close Door (Revoke)** anytime.
+   - **Arrange Your Space Your Way**: Pick room themes (`Warm Stone`, `Sunlit Sage`, `Terracotta Clay`, `Morning Sun`, `Midnight Studio`), decorate with 2.5D objects, reorder room sections, manage your own drag-and-drop personal board, see claimed house tasks, and log personal exercise/diet/driving trackers.
 
-- **Home Pulse (Dashboard)**: Instant household snapshot — who's free vs. busy right now, today's overlapping family blocks, pending time-booking requests, health/plan progress, and priority chores/shopping items.
-- **Common Calendar & Time-Booking ("Overlap Engine")**:
-  - Side-by-side and overlaid household schedule distinguishing **Shared / Overlapping** events (e.g., Family Dinner, Costco Run) from **Individual** plans (e.g., Driving Lesson, Morning Yoga) and **Private** blocks (rendered as `"Busy"` to other members).
-  - **Book Someone's Time**: Select a family member, view real-time conflict detection and open 30/60-min slots, and send a structured booking request (`Pending → Accepted / Declined`).
-- **Health, Diet & Life Plan Trackers**:
-  - Track **Exercise** (Yoga, Running, Strength, Cycling), **Diet & Nutrition** (meals, hydration, dietary plans), and **Ongoing Life Plans** (Driving Lessons hours, 30-Day Yoga streak, Weekly Grocery Budget).
-  - Household-wide visibility with optional personal privacy.
-- **Shared Household Lists & Chores**:
-  - Dedicated lists for **Shopping**, **Meal Prep**, and **Home & Yard Chores** (lawn mowing, dishes, laundry, maintenance).
-  - Assign owners, set priority/due dates, check off in real time, and filter by **Mine**, **Shared**, or **Everyone**.
-- **Family Roles & Permissions (RBAC)**:
-  - `HEAD` (Head of Household), `CO_HEAD`, `MEMBER`, `JUNIOR`, and `GUEST` roles enforced across every API route.
-  - Per-member permission overrides, private-block redaction, approval workflows, and a household audit log.
+3. **Multi-View Calendar *(Daily · Weekly · Yearly)***
+   - **Daily View**: Hourly timeline (`7 AM – 9 PM`) with overlapping family moments, House Gear tags, and private `"Busy"` blocks.
+   - **Weekly View**: 7-day Google/Notion-style grid to visually spot overlaps and open windows.
+   - **Yearly View**: Full 12-month activity heatmap — click any day to zoom straight into Daily View.
+   - **Book Someone's Time**: Live conflict-free slot finder respecting both personal private blocks and House Gear availability.
+
+4. **Family & Doors *(Hallway + Role-Based Governance)***
+   - Browse every member's 2.5D door, knock with a message, or step inside once allowed.
+   - Real household roles (`HEAD`, `CO_HEAD`, `MEMBER`, `JUNIOR`, `GUEST`), Junior booking approvals, and governance audit log.
 
 ---
 
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router) + React 19 + TypeScript
-- **Styling**: Tailwind CSS + Lucide icons (PWA-ready for mobile & desktop)
-- **Database**: SQLite via Drizzle ORM + `@libsql/client` (zero external DB setup locally; seamlessly upgrades to Turso / PostgreSQL)
-- **Auth & RBAC**: Signed HTTP-only session cookies (`scrypt` + HMAC-SHA256) with server-enforced RBAC middleware
-- **Testing**: Vitest unit tests for RBAC permissions & the schedule overlap/time-booking engine
+- **UI & Motion**: Tailwind CSS + Framer Motion (2.5D tilt cards, spring pills, bespoke matte-clay 2.5D assets) + Lucide Icons
+- **Database**: SQLite via Drizzle ORM + `@libsql/client` (local-first `./data/domus.db`; upgrades cleanly to Turso/PostgreSQL)
+- **Auth & RBAC**: Signed HTTP-only session cookies (`scrypt` + HMAC-SHA256) with server-enforced RBAC & room-knock guards
+- **Testing**: Vitest unit tests (`tests/rbac.test.ts`, `tests/schedule.test.ts`)
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-- Node.js `20+` (Node `22/24` recommended)
-- `pnpm 9+`
-
-### 1. Install & configure
-
 ```bash
 pnpm install
 cp .env.example .env
-```
-
-### 2. Initialize & seed the local database
-
-```bash
-pnpm db:push
 pnpm db:seed
-```
-
-### 3. Run the development server
-
-```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) (or `pnpm exec next dev --port 3005`).
 
-> **Demo accounts** (seeded by `pnpm db:seed`, password for all: `domus123`):
-> - **Aarav (Head of Household)** — `aarav@domus.local` (`HEAD`)
-> - **Meera (Co-Head)** — `meera@domus.local` (`CO_HEAD`)
-> - **Rohan (Family Member)** — `rohan@domus.local` (`MEMBER`)
-> - **Ananya (Junior)** — `ananya@domus.local` (`JUNIOR`)
-> - **Priya Auntie (Guest / Helper)** — `priya@domus.local` (`GUEST`)
->
-> You can also use the **Role Switcher** in the header (when `NEXT_PUBLIC_ENABLE_DEMO_SWITCHER=true`) to immediately experience how permissions and private-event redaction adapt across roles.
+> **Seeded Demo Accounts** (password for all: `domus123`):
+> - **Aarav** (`aarav@domus.local`) — `HEAD` (Head of Household)
+> - **Meera** (`meera@domus.local`) — `CO_HEAD`
+> - **Rohan** (`rohan@domus.local`) — `MEMBER`
+> - **Ananya** (`ananya@domus.local`) — `JUNIOR`
+> - **Priya Auntie** (`priya@domus.local`) — `GUEST`
 
 ---
 
-## Repository Layout
+## Documentation
 
-```text
-Domus/
-├── docs/
-│   ├── PRD.md            # Product Requirements Document
-│   ├── ARCHITECTURE.md   # System & database architecture
-│   ├── PERMISSIONS.md    # Role-based access control & privacy model
-│   └── ROADMAP.md        # Phased delivery roadmap
-├── public/
-│   └── manifest.json     # PWA manifest
-├── src/
-│   ├── app/              # Next.js App Router pages & REST API routes
-│   ├── components/       # Modular UI views (Dashboard, Calendar, Trackers, Lists, Family)
-│   ├── db/               # Drizzle schema, SQLite client, and household seeder
-│   └── lib/              # RBAC engine, session auth, schedule overlap engine, Zod schemas
-└── tests/                # Vitest suites for RBAC and time-booking overlap logic
-```
-
----
-
-## Scripts
-
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start Next.js development server on port 3000 |
-| `pnpm build` | Production build check |
-| `pnpm typecheck` | TypeScript strict type check |
-| `pnpm test` | Run Vitest unit tests (RBAC + Overlap Engine) |
-| `pnpm db:push` | Push Drizzle schema to SQLite |
-| `pnpm db:seed` | Seed realistic multi-role household data |
-
----
+- [docs/PRD.md](docs/PRD.md) — Product Requirements & Real House Model
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System Architecture, Database Schema & Overlap Engine
+- [docs/PERMISSIONS.md](docs/PERMISSIONS.md) — Household RBAC & Universal Knock-to-Visit Privacy
+- [docs/ROADMAP.md](docs/ROADMAP.md) — Delivery Roadmap
 
 Built under **[Oblivion Labs](https://github.com/Oblivion-Labs-Dev)**.
