@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
+  Award,
   BellRing,
   Calendar as CalendarIcon,
   Camera,
@@ -91,6 +92,37 @@ export default function PersonalRoomView({
   const [trkIconId, setTrkIconId] = useState("weights");
   const [trkUnit, setTrkUnit] = useState("sessions");
   const [trkTarget, setTrkTarget] = useState(5);
+
+  // Confetti celebration + removable Earned Badges
+  const [confettiGoalTitle, setConfettiGoalTitle] = useState<string | null>(
+    null
+  );
+  const [dismissedBadgeIds, setDismissedBadgeIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(
+        `domus_dismissed_badges_${roomOwnerId}`
+      );
+      setDismissedBadgeIds(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      setDismissedBadgeIds([]);
+    }
+  }, [roomOwnerId]);
+
+  function handleDismissBadge(trackerId: string) {
+    setDismissedBadgeIds((prev) => {
+      const next = Array.from(new Set([...prev, trackerId]));
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          `domus_dismissed_badges_${roomOwnerId}`,
+          JSON.stringify(next)
+        );
+      }
+      return next;
+    });
+  }
 
   const isOwnRoom = roomOwnerId === currentMember.id;
   const memberById = new Map(members.map((m) => [m.id, m]));
@@ -313,18 +345,38 @@ export default function PersonalRoomView({
     }
   }
 
-  async function handleQuickLogTracker(trackerId: string) {
+  async function handleQuickLogTracker(tracker: TrackerDTO) {
+    const wasComplete = tracker.currentValue >= tracker.targetValue;
+    const willBeComplete = tracker.currentValue + 1 >= tracker.targetValue;
+
     await fetch("/api/trackers/logs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        trackerId,
+        trackerId: tracker.id,
         date: new Date().toISOString().slice(0, 10),
         value: 1,
         note: "",
       }),
     });
+
+    if (!wasComplete && willBeComplete) {
+      // Un-dismiss badge if they re-completed it, and launch confetti!
+      setDismissedBadgeIds((prev) => prev.filter((id) => id !== tracker.id));
+      setConfettiGoalTitle(tracker.title);
+      setTimeout(() => setConfettiGoalTitle(null), 2600);
+    }
+
     await loadRoom();
+  }
+
+  async function handleDeleteTracker(trackerId: string) {
+    setTrackers((prev) => prev.filter((t) => t.id !== trackerId));
+    const res = await fetch(
+      `/api/trackers?id=${encodeURIComponent(trackerId)}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) await loadRoom();
   }
 
   async function handleAddTracker(e: React.FormEvent) {
@@ -386,6 +438,10 @@ export default function PersonalRoomView({
   const isDoorOpen = Boolean(config?.isPublic);
   const taskCards = cards.filter((c) => c.cardType !== "NOTE");
   const noteCards = cards.filter((c) => c.cardType === "NOTE");
+  const earnedBadges = trackers.filter(
+    (t) =>
+      t.currentValue >= t.targetValue && !dismissedBadgeIds.includes(t.id)
+  );
 
   const NOTE_SWATCHES: Array<{
     id: "butter" | "cream" | "terracotta" | "sage" | "sky";
@@ -401,7 +457,69 @@ export default function PersonalRoomView({
   ];
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="relative space-y-4 pb-6">
+      {/* CELEBRATORY CONFETTI BURST WHEN A GOAL REACHES 100%! */}
+      <AnimatePresence>
+        {confettiGoalTitle && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-none fixed inset-0 z-50 overflow-hidden"
+          >
+            {Array.from({ length: 36 }).map((_, i) => {
+              const colors = [
+                "#ef6b45",
+                "#fbbf24",
+                "#34d399",
+                "#38bdf8",
+                "#fb7185",
+                "#a78bfa",
+              ];
+              const leftPct = 8 + ((i * 2.5) % 84);
+              const drift = (i % 2 === 0 ? 1 : -1) * (25 + (i % 5) * 18);
+              return (
+                <motion.span
+                  key={i}
+                  initial={{
+                    y: -20,
+                    x: 0,
+                    rotate: 0,
+                    opacity: 1,
+                    scale: 0.9,
+                  }}
+                  animate={{
+                    y: "95vh",
+                    x: drift,
+                    rotate: 360 + (i % 4) * 120,
+                    opacity: [1, 1, 0],
+                  }}
+                  transition={{
+                    duration: 1.8 + (i % 5) * 0.22,
+                    delay: (i % 7) * 0.05,
+                    ease: "easeOut",
+                  }}
+                  className="absolute top-0 h-3 w-2 rounded-sm shadow-sm"
+                  style={{
+                    left: `${leftPct}%`,
+                    backgroundColor: colors[i % colors.length],
+                  }}
+                />
+              );
+            })}
+            <motion.div
+              initial={{ opacity: 0, y: -20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 24, scale: 1 }}
+              exit={{ opacity: 0, y: -12 }}
+              className="mx-auto mt-16 flex w-fit items-center gap-2.5 rounded-full border border-amber-300 bg-[#1f332b] px-5 py-2.5 text-sm font-extrabold text-white shadow-2xl"
+            >
+              <Award className="h-4 w-4 text-amber-300" />
+              Goal Reached: {confettiGoalTitle}! Badge Earned!
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AvatarEditorModal
         open={avatarEditorOpen}
         currentAvatarId={
@@ -510,6 +628,47 @@ export default function PersonalRoomView({
             )}
           </div>
         </div>
+
+        {/* Earned Goal Badges Shelf (with 1-click Remove permission for room owner) */}
+        {earnedBadges.length > 0 && (
+          <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-[#e8dfd3] pt-3">
+            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-600">
+              <Award className="h-3.5 w-3.5" />
+              Earned Badges:
+            </span>
+            {earnedBadges.map((b) => {
+              const icon =
+                getMiniatureByIdOrSrc(b.category) ??
+                getMiniatureByIdOrSrc(b.type);
+              return (
+                <span
+                  key={b.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-100/90 px-2.5 py-1 text-[11px] font-extrabold text-amber-950 shadow-sm"
+                >
+                  {icon && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={icon.src}
+                      alt=""
+                      className="h-4 w-4 rounded object-contain"
+                    />
+                  )}
+                  🏆 {b.title}
+                  {isOwnRoom && (
+                    <button
+                      type="button"
+                      onClick={() => handleDismissBadge(b.id)}
+                      title="Remove badge"
+                      className="ml-0.5 rounded-full p-0.5 opacity-70 transition hover:bg-black/10 hover:opacity-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* Incoming Knocks / Active Guests strip (only shows when someone is knocking or inside) */}
         {isOwnRoom && (pendingKnocks.length > 0 || activeGuests.length > 0) && (
@@ -917,14 +1076,29 @@ export default function PersonalRoomView({
                         </div>
                       </div>
                       {isOwnRoom && (
-                        <button
-                          type="button"
-                          onClick={() => handleQuickLogTracker(t.id)}
-                          className="domus-btn-secondary px-2.5 py-1.5 text-xs"
-                          title="Log +1"
-                        >
-                          +1
-                        </button>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {pct >= 100 ? (
+                            <span className="inline-flex items-center gap-1 rounded-xl bg-amber-100 px-2 py-1 text-[10px] font-extrabold text-amber-900">
+                              🏆 Done
+                            </span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => handleQuickLogTracker(t)}
+                            className="domus-btn-secondary px-2.5 py-1.5 text-xs"
+                            title="Log +1"
+                          >
+                            +1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTracker(t.id)}
+                            title="Delete goal"
+                            className="rounded-lg p-1 text-[#8a7c71] transition hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   );

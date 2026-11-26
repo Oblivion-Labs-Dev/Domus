@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { trackerLogs, trackers } from "@/db/schema";
 import { getCurrentMember } from "@/lib/auth";
@@ -78,4 +78,26 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ id }, { status: 201 });
+}
+
+export async function DELETE(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Tracker id required" }, { status: 400 });
+  }
+  await db
+    .delete(trackers)
+    .where(
+      and(
+        eq(trackers.id, id),
+        eq(trackers.householdId, actor.householdId),
+        eq(trackers.memberId, actor.id)
+      )
+    );
+  return NextResponse.json({ ok: true });
 }
