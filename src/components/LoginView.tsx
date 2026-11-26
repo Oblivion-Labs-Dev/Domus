@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -24,10 +24,6 @@ interface LoginViewProps {
 export default function LoginView({ onAuthenticated }: LoginViewProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<"ENTER" | "CREATE" | "RECOVER">("ENTER");
-
-  // Interactive 3D tilt for the floating house diorama
-  const houseRef = useRef<HTMLDivElement>(null);
-  const [houseTilt, setHouseTilt] = useState({ rotateX: 0, rotateY: 0 });
 
   // Enter House (ONLY House Name/Key + Room Key — key identifies the member automatically!)
   const [houseIdentifier, setHouseIdentifier] = useState("");
@@ -63,18 +59,6 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [modalOpen]);
-
-  function handleHouseMouseMove(e: React.MouseEvent<HTMLDivElement>) {
-    const el = houseRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width;
-    const py = (e.clientY - rect.top) / rect.height;
-    setHouseTilt({
-      rotateY: (px - 0.5) * 14,
-      rotateX: (0.5 - py) * 12,
-    });
-  }
 
   async function handleEnterHouse(e: React.FormEvent) {
     e.preventDefault();
@@ -340,71 +324,28 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             </motion.div>
           </div>
 
-          {/* Right Column: Borderless Floating 3D House Centerpiece (NO square card!) */}
+          {/* Right Column: Borderless Static 3D Multi-Room House Centerpiece (zero cursor interaction, zero bottom residue) */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 16 }}
+            initial={{ opacity: 0, scale: 0.94, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ delay: 0.1, type: "spring", stiffness: 180, damping: 20 }}
-            className="relative flex flex-col items-center justify-center lg:col-span-6"
-            style={{ perspective: 1200 }}
+            transition={{ delay: 0.08, type: "spring", stiffness: 180, damping: 22 }}
+            className="pointer-events-none relative flex items-center justify-center lg:col-span-6"
           >
-            {/* Soft warm radial aura behind the house to blend with page background */}
+            {/* Soft warm radial aura blending the 3D house into the page background */}
             <div
-              className="pointer-events-none absolute inset-6 -z-10 rounded-full blur-3xl"
+              className="pointer-events-none absolute inset-4 -z-10 rounded-full blur-3xl"
               style={{
                 background:
-                  "radial-gradient(circle, rgba(255, 241, 224, 0.85) 0%, rgba(244, 198, 168, 0.25) 55%, transparent 75%)",
+                  "radial-gradient(circle, rgba(255, 245, 232, 0.85) 0%, rgba(244, 198, 168, 0.22) 58%, transparent 78%)",
               }}
             />
 
-            <div
-              ref={houseRef}
-              onMouseMove={handleHouseMouseMove}
-              onMouseLeave={() => setHouseTilt({ rotateX: 0, rotateY: 0 })}
-              className="relative flex w-full max-w-[560px] flex-col items-center cursor-pointer"
-              onClick={() => openModal("ENTER")}
-              title="Click to enter your digital house"
-            >
-              <motion.div
-                animate={{
-                  rotateX: houseTilt.rotateX,
-                  rotateY: houseTilt.rotateY,
-                  y: [0, -10, 0],
-                }}
-                transition={{
-                  rotateX: { type: "spring", stiffness: 260, damping: 22 },
-                  rotateY: { type: "spring", stiffness: 260, damping: 22 },
-                  y: { duration: 5.5, repeat: Infinity, ease: "easeInOut" },
-                }}
-                style={{ transformStyle: "preserve-3d" }}
-                className="relative w-full"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/house-hero-cutout.png"
-                  alt="Domus 3D Digital House"
-                  className="mx-auto w-full max-w-[540px] select-none object-contain"
-                  style={{
-                    filter:
-                      "drop-shadow(0 30px 38px rgba(96, 62, 42, 0.22)) drop-shadow(0 8px 14px rgba(96, 62, 42, 0.12))",
-                  }}
-                />
-              </motion.div>
-
-              {/* Soft floating 3D ground shadow that breathes with the house */}
-              <motion.div
-                animate={{
-                  scaleX: [1, 0.92, 1],
-                  opacity: [0.32, 0.2, 0.32],
-                }}
-                transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-                className="-mt-4 h-7 w-[68%] rounded-full blur-xl"
-                style={{
-                  background:
-                    "radial-gradient(ellipse, rgba(78, 50, 34, 0.55) 0%, transparent 72%)",
-                }}
-              />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/house-hero-cutout.png"
+              alt="Domus Multi-Room 3D Digital House"
+              className="mx-auto w-full max-w-[540px] select-none object-contain"
+            />
           </motion.div>
         </div>
       </main>
