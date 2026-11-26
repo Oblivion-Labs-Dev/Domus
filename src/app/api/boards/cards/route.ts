@@ -176,3 +176,138 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ id: cardId, linkedEventId }, { status: 201 });
 }
+
+export async function PATCH(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const cardId = typeof body?.id === "string" ? body.id : "";
+  if (!cardId) {
+    return NextResponse.json({ error: "Card id required" }, { status: 400 });
+  }
+
+  const rows = await db
+    .select()
+    .from(boardCards)
+    .where(
+      and(
+        eq(boardCards.id, cardId),
+        eq(boardCards.householdId, actor.householdId)
+      )
+    )
+    .limit(1);
+
+  const card = rows[0];
+  if (!card) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
+
+  const boardRows = await db
+    .select()
+    .from(boards)
+    .where(eq(boards.id, card.boardId))
+    .limit(1);
+  const board = boardRows[0];
+  if (board?.scope === "PERSONAL" && board.ownerId !== actor.id) {
+    return NextResponse.json(
+      { error: "Only the room owner can edit their personal room items." },
+      { status: 403 }
+    );
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (typeof body.columnId === "string" && body.columnId) {
+    updates.columnId = body.columnId;
+  }
+  if (typeof body.title === "string" && body.title.trim()) {
+    updates.title = body.title.trim().slice(0, 120);
+  }
+  if (typeof body.description === "string") {
+    updates.description = body.description;
+  }
+  if (typeof body.dueDate === "string") {
+    updates.dueDate = body.dueDate;
+  }
+  if (typeof body.noteColor === "string") {
+    updates.noteColor = body.noteColor;
+  }
+
+  await db
+    .update(boardCards)
+    .set(updates)
+    .where(
+      and(
+        eq(boardCards.id, cardId),
+        eq(boardCards.householdId, actor.householdId)
+      )
+    );
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const cardId = searchParams.get("id");
+  if (!cardId) {
+    return NextResponse.json({ error: "Card id required" }, { status: 400 });
+  }
+
+  const rows = await db
+    .select()
+    .from(boardCards)
+    .where(
+      and(
+        eq(boardCards.id, cardId),
+        eq(boardCards.householdId, actor.householdId)
+      )
+    )
+    .limit(1);
+
+  const card = rows[0];
+  if (!card) {
+    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  }
+
+  const boardRows = await db
+    .select()
+    .from(boards)
+    .where(eq(boards.id, card.boardId))
+    .limit(1);
+  const board = boardRows[0];
+  if (board?.scope === "PERSONAL" && board.ownerId !== actor.id) {
+    return NextResponse.json(
+      { error: "Only the room owner can delete their personal room items." },
+      { status: 403 }
+    );
+  }
+
+  if (card.linkedEventId) {
+    await db
+      .delete(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.id, card.linkedEventId),
+          eq(calendarEvents.householdId, actor.householdId)
+        )
+      );
+  }
+
+  await db
+    .delete(boardCards)
+    .where(
+      and(
+        eq(boardCards.id, cardId),
+        eq(boardCards.householdId, actor.householdId)
+      )
+    );
+
+  return NextResponse.json({ ok: true });
+}

@@ -259,18 +259,23 @@ export default function PersonalRoomView({
     setCards((prev) =>
       prev.map((c) => (c.id === card.id ? { ...c, columnId: nextColId } : c))
     );
-    await fetch("/api/boards/cards", {
+    const res = await fetch("/api/boards/cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: card.id, columnId: nextColId }),
     });
+    if (!res.ok) await loadRoom();
   }
 
   async function handleDeleteTask(cardId: string) {
     setCards((prev) => prev.filter((c) => c.id !== cardId));
-    await fetch(`/api/boards/cards?id=${encodeURIComponent(cardId)}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(
+      `/api/boards/cards?id=${encodeURIComponent(cardId)}`,
+      {
+        method: "DELETE",
+      }
+    );
+    if (!res.ok) await loadRoom();
   }
 
   async function handleSchedulePersonalTask(e: React.FormEvent) {
