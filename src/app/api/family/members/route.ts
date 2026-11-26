@@ -160,12 +160,23 @@ export async function POST(request: Request) {
     createdAt: now,
   });
 
-  const houseKey = `DOMUS-${actor.householdId.slice(-4).toUpperCase()}`;
+  const hhRows = await db
+    .select({
+      houseKey: households.houseKey,
+      name: households.name,
+    })
+    .from(households)
+    .where(eq(households.id, actor.householdId))
+    .limit(1);
+
+  const houseKey = hhRows[0]?.houseKey ?? "DOMUS-HOME";
+  const residenceName = hhRows[0]?.name ?? "Your Residence";
 
   return NextResponse.json(
     {
       id,
       houseKey,
+      residenceName,
       roomKey,
       name: parsed.data.name,
       email: parsed.data.email.toLowerCase(),
