@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { AVATAR_PRESETS } from "@/lib/avatars";
 import { CLAY_MINIATURES, getMiniatureByIdOrSrc } from "@/lib/miniatures";
-import { MemberContext, ROLE_META, Role } from "@/lib/rbac";
+import { MemberContext, Role } from "@/lib/rbac";
 import FamilyCalendarPanel from "./FamilyCalendarPanel";
 import MemberAvatar from "./MemberAvatar";
 import MiniaturePicker from "./MiniaturePicker";
@@ -1210,16 +1210,41 @@ export default function CommonAreaView({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddMemberOpen(false);
-                      setMintedMemberKeycard(null);
-                    }}
-                    className="domus-btn-accent w-full py-2.5 text-xs"
-                  >
-                    Done
-                  </button>
+                  <div className="flex flex-col gap-2.5 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyValue(
+                          "mAll",
+                          `Welcome to ${household?.name ?? "our Domus house"}, ${mintedMemberKeycard.name}!\nHouse Key: ${mintedMemberKeycard.houseKey}\nYour Room Key: ${mintedMemberKeycard.roomKey}`
+                        )
+                      }
+                      className="domus-btn-secondary flex-1 py-2.5 text-xs"
+                    >
+                      {copiedField === "mAll" ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-sage-600" />
+                          Both Keys Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy Both Keys
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddMemberOpen(false);
+                        setMintedMemberKeycard(null);
+                      }}
+                      className="domus-btn-accent flex-1 py-2.5 text-xs"
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <form onSubmit={handleAddMember} className="space-y-4">
@@ -1271,13 +1296,18 @@ export default function CommonAreaView({
                       onChange={(e) => setMemberRole(e.target.value as Role)}
                       className="domus-input"
                     >
-                      {(["CO_HEAD", "MEMBER", "JUNIOR", "GUEST"] as Role[]).map(
-                        (r) => (
-                          <option key={r} value={r}>
-                            {ROLE_META[r].label} — {ROLE_META[r].description}
-                          </option>
-                        )
-                      )}
+                      <option value="CO_HEAD">
+                        Co-Head — Co-leads the house, invites family members,
+                        and manages shared lists &amp; calendar.
+                      </option>
+                      <option value="MEMBER">
+                        Family Member — Owns a private room, shares house lists,
+                        and manages personal &amp; family schedules.
+                      </option>
+                      <option value="GUEST">
+                        Guest / Helper — Collaborates in the Common Area while
+                        private rooms remain protected.
+                      </option>
                     </select>
                   </div>
 
