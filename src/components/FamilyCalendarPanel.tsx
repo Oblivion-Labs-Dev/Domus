@@ -182,24 +182,26 @@ export default function FamilyCalendarPanel({
     try {
       const startTime = `${eventDate}T${sStr}:00`;
       const endTime = `${eventDate}T${eStr}:00`;
-      const involved =
-        eventCategory === "BIRTHDAY" || eventCategory === "HOLIDAY"
-          ? members.map((m) => m.id)
-          : participantIds.length > 0
-          ? participantIds
-          : [currentMember.id];
+      const isPersonal = scope === "MINE" && eventCategory === "FAMILY";
+      const involved = isPersonal
+        ? [currentMember.id]
+        : eventCategory === "BIRTHDAY" || eventCategory === "HOLIDAY"
+        ? members.map((m) => m.id)
+        : participantIds.length > 0
+        ? participantIds
+        : [currentMember.id];
 
       const res = await fetch("/api/calendar/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: eventTitle.trim(),
-          category: eventCategory,
+          category: isPersonal ? "PERSONAL" : eventCategory,
           startTime,
           endTime,
           participantIds: involved,
-          visibility: "FAMILY",
-          isShared: involved.length > 1 || eventCategory !== "FAMILY",
+          visibility: isPersonal ? "PRIVATE" : "FAMILY",
+          isShared: !isPersonal && (involved.length > 1 || eventCategory !== "FAMILY"),
           location: eventLocation.trim(),
           notes: eventNotes.trim(),
         }),
@@ -251,7 +253,12 @@ export default function FamilyCalendarPanel({
         new Set([...(ev.participantIds ?? []), ...(ev.participantIds?.length ? [] : [ev.ownerId])])
       );
 
-      // Filter for "My Calendar" scope
+      // Scope rules:
+      // - ALL HOUSE: shows shared house events, birthdays & holidays (hides private personal events!)
+      // - MY CALENDAR: shows your own private events + any house events where you're involved + birthdays & holidays
+      if (scope === "ALL" && ev.visibility === "PRIVATE") {
+        continue;
+      }
       if (
         scope === "MINE" &&
         ev.category !== "BIRTHDAY" &&
@@ -1000,50 +1007,55 @@ export default function FamilyCalendarPanel({
 
               <div className="pr-8">
                 <h3 className="text-base font-extrabold text-[#1e1916]">
-                  Schedule on Calendar
+                  {scope === "MINE"
+                    ? "Add to My Calendar"
+                    : "Schedule for the House"}
                 </h3>
                 <p className="mt-0.5 text-xs text-[#6b5d53]">
-                  Add a timed plan, family meeting, or yearly birthday — syncs
-                  automatically to everyone involved.
+                  {scope === "MINE"
+                    ? "Private to your personal calendar — won't clutter the house calendar."
+                    : "Add a shared family plan, meeting, or yearly birthday — syncs to everyone involved."}
                 </p>
               </div>
 
-              {/* Type Selector */}
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    {
-                      id: "FAMILY",
-                      label: "Event / Task",
-                      icon: <CalendarIcon className="h-3.5 w-3.5" />,
-                    },
-                    {
-                      id: "BIRTHDAY",
-                      label: "Birthday",
-                      icon: <Cake className="h-3.5 w-3.5" />,
-                    },
-                    {
-                      id: "HOLIDAY",
-                      label: "Holiday",
-                      icon: <Sparkles className="h-3.5 w-3.5" />,
-                    },
-                  ] as const
-                ).map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setEventCategory(cat.id)}
-                    className={`flex items-center justify-center gap-1.5 rounded-2xl py-2 text-xs font-bold transition ${
-                      eventCategory === cat.id
-                        ? "bg-[#1f332b] text-white shadow-sm"
-                        : "bg-[#f3ede4] text-[#5c5047] hover:bg-[#e8dfd3]"
-                    }`}
-                  >
-                    {cat.icon}
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
+              {/* Type Selector (only needed on All House; My Calendar is personal events/tasks) */}
+              {scope === "ALL" && (
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      {
+                        id: "FAMILY",
+                        label: "Event / Task",
+                        icon: <CalendarIcon className="h-3.5 w-3.5" />,
+                      },
+                      {
+                        id: "BIRTHDAY",
+                        label: "Birthday",
+                        icon: <Cake className="h-3.5 w-3.5" />,
+                      },
+                      {
+                        id: "HOLIDAY",
+                        label: "Holiday",
+                        icon: <Sparkles className="h-3.5 w-3.5" />,
+                      },
+                    ] as const
+                  ).map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setEventCategory(cat.id)}
+                      className={`flex items-center justify-center gap-1.5 rounded-2xl py-2 text-xs font-bold transition ${
+                        eventCategory === cat.id
+                          ? "bg-[#1f332b] text-white shadow-sm"
+                          : "bg-[#f3ede4] text-[#5c5047] hover:bg-[#e8dfd3]"
+                      }`}
+                    >
+                      {cat.icon}
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-xs font-bold text-[#4e433b]">
@@ -1055,7 +1067,9 @@ export default function FamilyCalendarPanel({
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
                   placeholder={
-                    eventCategory === "BIRTHDAY"
+                    scope === "MINE"
+                      ? "e.g., Study session, Dentist, Gym..."
+                      : eventCategory === "BIRTHDAY"
                       ? "e.g., Aunt Priya's Birthday"
                       : "e.g., Driving practice with Akshay / Family Meeting"
                   }
@@ -1122,8 +1136,8 @@ export default function FamilyCalendarPanel({
                 </div>
               )}
 
-              {/* Who's Involved (Syncs to Family Calendar + each selected person's Personal Calendar!) */}
-              {eventCategory === "FAMILY" && (
+              {/* Who's Involved — ONLY on All House Calendar (never on My Calendar!) */}
+              {scope === "ALL" && eventCategory === "FAMILY" && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-1.5 text-xs font-bold text-[#4e433b]">
