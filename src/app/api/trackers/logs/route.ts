@@ -56,9 +56,19 @@ export async function POST(request: Request) {
     );
   }
 
+  if (tracker.currentValue >= tracker.targetValue) {
+    return NextResponse.json(
+      { error: "This goal is already 100% complete." },
+      { status: 400 }
+    );
+  }
+
   const id = `tlog_${crypto.randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
-  const nextValue = Number((tracker.currentValue + parsed.data.value).toFixed(2));
+  const nextValue = Math.min(
+    tracker.targetValue,
+    Number((tracker.currentValue + parsed.data.value).toFixed(2))
+  );
 
   await db.insert(trackerLogs).values({
     id,

@@ -346,10 +346,10 @@ export default function PersonalRoomView({
   }
 
   async function handleQuickLogTracker(tracker: TrackerDTO) {
-    const wasComplete = tracker.currentValue >= tracker.targetValue;
+    if (tracker.currentValue >= tracker.targetValue) return;
     const willBeComplete = tracker.currentValue + 1 >= tracker.targetValue;
 
-    await fetch("/api/trackers/logs", {
+    const res = await fetch("/api/trackers/logs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -360,7 +360,7 @@ export default function PersonalRoomView({
       }),
     });
 
-    if (!wasComplete && willBeComplete) {
+    if (res.ok && willBeComplete) {
       // Un-dismiss badge if they re-completed it, and launch confetti!
       setDismissedBadgeIds((prev) => prev.filter((id) => id !== tracker.id));
       setConfettiGoalTitle(tracker.title);
@@ -1071,25 +1071,27 @@ export default function PersonalRoomView({
                             {t.title}
                           </p>
                           <p className="text-[11px] text-[#6b5d53]">
-                            {t.currentValue} / {t.targetValue} {t.unit}
+                            {Math.min(t.currentValue, t.targetValue)} /{" "}
+                            {t.targetValue} {t.unit}
                           </p>
                         </div>
                       </div>
                       {isOwnRoom && (
-                        <div className="flex shrink-0 items-center gap-1">
-                          {pct >= 100 ? (
-                            <span className="inline-flex items-center gap-1 rounded-xl bg-amber-100 px-2 py-1 text-[10px] font-extrabold text-amber-900">
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {t.currentValue >= t.targetValue ? (
+                            <span className="inline-flex items-center gap-1 rounded-xl bg-amber-100 px-2.5 py-1 text-[11px] font-extrabold text-amber-900">
                               🏆 Done
                             </span>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => handleQuickLogTracker(t)}
-                            className="domus-btn-secondary px-2.5 py-1.5 text-xs"
-                            title="Log +1"
-                          >
-                            +1
-                          </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickLogTracker(t)}
+                              className="domus-btn-secondary px-2.5 py-1.5 text-xs"
+                              title="Log +1"
+                            >
+                              +1
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDeleteTracker(t.id)}
