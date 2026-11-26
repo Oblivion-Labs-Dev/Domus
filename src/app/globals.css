@@ -135,38 +135,157 @@
   }
 }
 
-/* Midnight readability helpers */
-[data-palette="midnight"] .domus-card,
-[data-palette="midnight"] .domus-tile {
-  color: #f1f5f9;
+/* Warm Architectural Night Mode (Auto after 7 PM or on-demand toggle!) */
+html.dark {
+  --domus-bg-base: #151210;
+  --domus-bg-grad: linear-gradient(
+    135deg,
+    #1c1714 0%,
+    #151312 52%,
+    #141c18 100%
+  );
+  --domus-surface: #221e1b;
+  --domus-surface-sub: #2b2622;
+  --domus-border: rgba(255, 240, 224, 0.1);
+  --domus-shadow-outer: rgba(0, 0, 0, 0.55);
+  --domus-shadow-inner: rgba(0, 0, 0, 0.45);
+  --domus-header-bg: rgba(27, 23, 20, 0.86);
+  --domus-header-text: #f5efe6;
+  --domus-accent: #e86a44;
+  --domus-accent-deep: #b33e1e;
+  --domus-ink: #f5efe6;
+  color-scheme: dark;
 }
 
-[data-palette="midnight"] .text-stone-900,
-[data-palette="midnight"] .text-stone-800 {
-  color: #f8fafc !important;
+html.dark body {
+  background-color: var(--domus-bg-base) !important;
+  background-image: var(--domus-bg-grad) !important;
+  color: #f5efe6;
 }
 
-[data-palette="midnight"] .text-stone-700,
-[data-palette="midnight"] .text-stone-600 {
-  color: #cbd5e1 !important;
+html.dark .domus-card {
+  background-color: #221e1b;
+  border-color: rgba(255, 240, 224, 0.1);
+  box-shadow:
+    0 22px 44px -14px rgba(0, 0, 0, 0.6),
+    0 6px 14px -6px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 244, 232, 0.08),
+    inset 0 -6px 12px rgba(0, 0, 0, 0.35);
+  color: #f5efe6;
 }
 
-[data-palette="midnight"] .text-stone-500,
-[data-palette="midnight"] .text-stone-400 {
-  color: #94a3b8 !important;
+html.dark .domus-tile {
+  background-color: #2b2622;
+  border-color: rgba(255, 240, 224, 0.08);
+  color: #f5efe6;
 }
 
-[data-palette="midnight"] .bg-white,
-[data-palette="midnight"] .bg-stone-50,
-[data-palette="midnight"] .bg-stone-100 {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
+html.dark .domus-input {
+  background-color: #191614;
+  border-color: rgba(255, 240, 224, 0.14);
+  color: #f5efe6;
 }
 
-[data-palette="midnight"] .domus-input {
-  background-color: #0f172a;
-  border-color: #334155;
-  color: #f8fafc;
+html.dark .domus-input::placeholder {
+  color: #8c7d70;
+}
+
+html.dark .domus-btn-secondary {
+  background-color: #2e2824;
+  color: #f5efe6;
+  border-color: rgba(255, 240, 224, 0.12);
+}
+
+html.dark .domus-btn-secondary:hover {
+  background-color: #39322c;
+}
+
+html.dark .text-\[\#1e1916\],
+html.dark .text-\[\#1d1714\],
+html.dark .text-\[\#2c2520\],
+html.dark .text-\[\#3d342e\],
+html.dark .text-stone-900,
+html.dark .text-stone-800 {
+  color: #f5efe6 !important;
+}
+
+html.dark .text-\[\#4e433b\],
+html.dark .text-\[\#574c44\],
+html.dark .text-\[\#5c5047\],
+html.dark .text-stone-700,
+html.dark .text-stone-600 {
+  color: #d1c4b7 !important;
+}
+
+html.dark .text-\[\#6b5d53\],
+html.dark .text-\[\#7c6e63\],
+html.dark .text-\[\#8a7c71\],
+html.dark .text-stone-500,
+html.dark .text-stone-400 {
+  color: #a69789 !important;
+}
+
+html.dark .bg-\[\#faf7f2\]\/80,
+html.dark .bg-\[\#faf7f2\]\/75 {
+  background-color: rgba(28, 24, 21, 0.84) !important;
+  border-color: rgba(255, 240, 224, 0.1) !important;
+}
+
+html.dark .bg-\[\#f3ede4\],
+html.dark .bg-\[\#f3ede4\]\/95,
+html.dark .bg-\[\#f3ede4\]\/90,
+html.dark .bg-\[\#f3ede4\]\/80,
+html.dark .bg-\[\#f3ede4\]\/75,
+html.dark .bg-\[\#f3ede4\]\/70,
+html.dark .bg-\[\#f3ece2\],
+html.dark .bg-\[\#efe7dc\],
+html.dark .bg-\[\#eae1d5\],
+html.dark .bg-\[\#fdfaf4\] {
+  background-color: #2b2622 !important;
+  border-color: rgba(255, 240, 224, 0.08) !important;
+}
+
+html.dark .bg-\[\#f3ede4\]\/35 {
+  background-color: rgba(43, 38, 34, 0.45) !important;
+}
+
+html.dark .bg-white,
+html.dark .bg-white\/85,
+html.dark .bg-white\/80 {
+  background-color: #352f2a !important;
+  color: #f5efe6 !important;
+}
+
+html.dark .border-\[\#e8dfd3\],
+html.dark .border-\[\#dfd4c6\],
+html.dark .border-\[\#e5dacb\],
+html.dark .border-white\/85,
+html.dark .border-white\/80,
+html.dark .border-white\/75 {
+  border-color: rgba(255, 240, 224, 0.12) !important;
+}
+
+/* Keep clay miniatures & 2.5D icons clean on dark surfaces */
+html.dark .mix-blend-multiply {
+  mix-blend-mode: normal !important;
+  border-radius: 0.75rem;
+}
+
+/* Keep pastel pinned sticky notes readable in dark mode */
+html.dark .bg-\[\#fef3c7\],
+html.dark .bg-\[\#fbf7ee\],
+html.dark .bg-\[\#fde8df\],
+html.dark .bg-\[\#e3f1e8\],
+html.dark .bg-\[\#e3effa\] {
+  color: #1e1916 !important;
+}
+
+html.dark .bg-\[\#fef3c7\] *,
+html.dark .bg-\[\#fbf7ee\] *,
+html.dark .bg-\[\#fde8df\] *,
+html.dark .bg-\[\#e3f1e8\] *,
+html.dark .bg-\[\#e3effa\] * {
+  color: #2c2520 !important;
 }
 
 /* True Claymorphic 2.5D Card */

@@ -11,7 +11,9 @@ import {
   Home,
   KeyRound,
   LogOut,
+  Moon,
   Shield,
+  Sun,
   X,
 } from "lucide-react";
 import {
@@ -67,6 +69,58 @@ export default function DomusApp() {
 
   const [copiedHouseKey, setCopiedHouseKey] = useState(false);
   const { weather, overrideKind, setOverrideKind } = useLocalWeather();
+
+  // Auto Night Dark Theme (7 PM - 6 AM) + On-Demand Toggle!
+  const [isDark, setIsDark] = useState(false);
+  const [themePref, setThemePref] = useState<"auto" | "light" | "dark">("auto");
+
+  useEffect(() => {
+    const computeNight = () => {
+      const h = new Date().getHours();
+      return h >= 19 || h < 6;
+    };
+
+    const saved =
+      typeof window !== "undefined"
+        ? (window.localStorage.getItem("domus_theme_pref") as
+            | "auto"
+            | "light"
+            | "dark"
+            | null)
+        : null;
+    const pref = saved ?? "auto";
+    setThemePref(pref);
+
+    const apply = (p: "auto" | "light" | "dark") => {
+      const dark = p === "dark" ? true : p === "light" ? false : computeNight();
+      setIsDark(dark);
+      document.documentElement.classList.toggle("dark", dark);
+    };
+
+    apply(pref);
+    const interval = setInterval(() => {
+      const currentSaved =
+        (window.localStorage.getItem("domus_theme_pref") as
+          | "auto"
+          | "light"
+          | "dark"
+          | null) ?? "auto";
+      if (currentSaved === "auto") apply("auto");
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  function handleToggleTheme() {
+    const nextDark = !isDark;
+    const nextPref = nextDark ? "dark" : "light";
+    setThemePref(nextPref);
+    setIsDark(nextDark);
+    document.documentElement.classList.toggle("dark", nextDark);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("domus_theme_pref", nextPref);
+    }
+  }
 
   useEffect(() => {
     const loaded = loadWallPaintConfig();
@@ -264,8 +318,31 @@ export default function DomusApp() {
             <NavbarWallClock />
           </div>
 
-          {/* Right Controls: Paint Bucket + Incoming Knocks + Demo Switcher + Avatar + Sign Out */}
+          {/* Right Controls: Day/Night Toggle + Paint Bucket + Incoming Knocks + Demo Switcher + Avatar + Sign Out */}
           <div className="relative flex shrink-0 items-center gap-2">
+            {/* On-Demand Day / Night Theme Toggle (auto-activates at night 7 PM - 6 AM) */}
+            <motion.button
+              type="button"
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={handleToggleTheme}
+              title={
+                isDark
+                  ? `Night Mode (${themePref === "auto" ? "Auto" : "Manual"}) — click for Day Mode`
+                  : `Day Mode (${themePref === "auto" ? "Auto" : "Manual"}) — click for Night Mode`
+              }
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-white/80 bg-[#f3ede4]/90 px-2.5 py-2 text-xs font-bold text-[#1e1916] shadow-sm transition hover:bg-white"
+            >
+              {isDark ? (
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
+              ) : (
+                <Moon className="h-3.5 w-3.5 text-indigo-600" />
+              )}
+              <span className="hidden xl:inline">
+                {isDark ? "Day" : "Night"}
+              </span>
+            </motion.button>
+
             {/* 2.5D Paint Bucket — opens centered Wall Paint & Wallpaper Studio from anywhere in the house */}
             <motion.button
               type="button"
