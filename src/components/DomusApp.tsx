@@ -27,8 +27,7 @@ import LoginView from "./LoginView";
 import MemberAvatar from "./MemberAvatar";
 import {
   NavbarWallClock,
-  NavbarWeatherBackdrop,
-  NavbarWeatherPill,
+  NavbarWeatherWindow,
   useLocalWeather,
 } from "./NavbarAtmosphere";
 import PersonalRoomView from "./PersonalRoomView";
@@ -194,16 +193,15 @@ export default function DomusApp() {
 
   return (
     <div className="min-h-screen">
-      {/* Airy Frosted Claymorphic Header — with live animated outdoor weather & analog wall clock */}
+      {/* Airy Frosted Claymorphic Header — with framed animated House Window & analog Wall Clock */}
       <header
-        className="sticky top-0 z-40 border-b border-white/75 bg-[#faf7f2]/75 text-[#1e1916] backdrop-blur-xl transition-colors duration-300"
+        className="sticky top-0 z-40 border-b border-white/75 bg-[#faf7f2]/80 text-[#1e1916] backdrop-blur-xl transition-colors duration-300"
         style={{
           boxShadow:
             "0 10px 30px -14px rgba(74, 52, 38, 0.14), inset 0 -1px 0 rgba(255, 255, 255, 0.65)",
         }}
       >
-        <NavbarWeatherBackdrop kind={weather.kind} />
-        <div className="relative z-10 mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="relative z-10 mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-2.5 sm:px-6">
           {/* Left: Home Brand + Residence Name + 1-click House Key */}
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -256,14 +254,14 @@ export default function DomusApp() {
             )}
           </div>
 
-          {/* Center: Analog Wall Clock + Live Outdoor Weather */}
-          <div className="flex shrink-0 items-center gap-2">
-            <NavbarWallClock />
-            <NavbarWeatherPill
+          {/* Center: Framed Animated Weather Window + Analog Wall Clock */}
+          <div className="flex shrink-0 items-center gap-2.5">
+            <NavbarWeatherWindow
               weather={weather}
               overrideKind={overrideKind}
               onSelectOverride={setOverrideKind}
             />
+            <NavbarWallClock />
           </div>
 
           {/* Right Controls: Paint Bucket + Incoming Knocks + Demo Switcher + Avatar + Sign Out */}
