@@ -18,6 +18,7 @@ export interface MemberDTO {
   color: string;
   avatarInitials: string;
   avatarId?: string | null;
+  isRoomPublic?: boolean;
   permissions: PermissionOverrides;
   createdAt?: string;
 }
@@ -84,6 +85,7 @@ export interface BoardColumnDTO {
   boardId: string;
   title: string;
   color: string;
+  iconAsset?: string | null;
   position: number;
 }
 
@@ -95,6 +97,7 @@ export interface BoardCardDTO {
   description: string | null;
   cardType: "TASK" | "NOTE";
   noteColor: NoteColorId;
+  iconAsset?: string | null;
   tags: string[];
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   assigneeId: string | null;
@@ -114,6 +117,7 @@ export interface RoomConfigDTO {
   roomTitle: string;
   theme: RoomThemeId;
   bannerQuote: string;
+  isPublic?: boolean;
   layout: string[];
   decorItems: PlacedDecor[];
 }
@@ -184,7 +188,7 @@ export interface AuditLogDTO {
   createdAt: string;
 }
 
-export type ActiveTab = "common" | "room" | "calendar" | "family";
+export type ActiveTab = "entry" | "common" | "room" | "calendar" | "family";
 
 export function formatTimeRange(startIso: string, endIso: string): string {
   const start = new Date(startIso);

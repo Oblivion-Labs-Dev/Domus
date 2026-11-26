@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { NOTE_COLORS, NoteColorId } from "@/lib/decor";
 import type { MemberContext } from "@/lib/rbac";
+import AssetPickerPopover from "./AssetPickerPopover";
 import type {
   BoardCardDTO,
   BoardColumnDTO,
@@ -55,6 +56,7 @@ export default function InteractiveBoard({
   const [showAddCol, setShowAddCol] = useState(false);
   const [newColTitle, setNewColTitle] = useState("");
   const [newColColor, setNewColColor] = useState("#4f7c5b");
+  const [newColIcon, setNewColIcon] = useState("");
 
   // Add card/note composer state
   const [composerColId, setComposerColId] = useState<string | null>(null);
@@ -62,6 +64,7 @@ export default function InteractiveBoard({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [noteColor, setNoteColor] = useState<NoteColorId>("cream");
+  const [cardIcon, setCardIcon] = useState("");
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">(
     "MEDIUM"
   );
@@ -108,6 +111,7 @@ export default function InteractiveBoard({
         boardId: board.id,
         title: newColTitle,
         color: newColColor,
+        iconAsset: newColIcon,
       }),
     });
     const d = await res.json();
@@ -116,6 +120,7 @@ export default function InteractiveBoard({
       return;
     }
     setNewColTitle("");
+    setNewColIcon("");
     setShowAddCol(false);
     await onRefresh();
   }
@@ -147,6 +152,7 @@ export default function InteractiveBoard({
         description,
         cardType,
         noteColor,
+        iconAsset: cardIcon,
         priority,
         tags,
         dueDate,
@@ -167,6 +173,7 @@ export default function InteractiveBoard({
     setTagsText("");
     setDueDate("");
     setResourceId("");
+    setCardIcon("");
     setComposerColId(null);
     setFeedback({
       type: "ok",
@@ -285,26 +292,42 @@ export default function InteractiveBoard({
         </motion.div>
       )}
 
-      {/* Add Column Form */}
+      {/* Add Column Form (with Cancel, Escape, and Contextual 2.5D Icon Picker) */}
       <AnimatePresence>
         {showAddCol && !readOnly && (
           <motion.form
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setShowAddCol(false);
+              }
+            }}
             onSubmit={handleAddColumn}
             className="domus-card flex flex-wrap items-end gap-3 p-4"
           >
-            <div className="min-w-[180px] flex-1">
+            <div className="min-w-[200px] flex-1">
               <label className="mb-1 block text-xs font-semibold text-stone-600">
                 New Column Name
               </label>
               <input
                 required
+                autoFocus
                 value={newColTitle}
                 onChange={(e) => setNewColTitle(e.target.value)}
-                placeholder="e.g., Weekend Ideas, Grocery Run, Waiting..."
-                className="domus-input"
+                placeholder="e.g., Weekend Ideas, Grocery Run, Yard..."
+                className="domus-input h-10"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">
+                2.5D Icon
+              </label>
+              <AssetPickerPopover
+                value={newColIcon}
+                onChange={setNewColIcon}
+                label="Add Icon"
               />
             </div>
             <div>
@@ -315,12 +338,25 @@ export default function InteractiveBoard({
                 type="color"
                 value={newColColor}
                 onChange={(e) => setNewColColor(e.target.value)}
-                className="h-9 w-14 cursor-pointer rounded-xl border border-stone-200 bg-white p-1"
+                className="h-10 w-14 cursor-pointer rounded-xl border border-stone-200 bg-white p-1"
               />
             </div>
-            <button type="submit" className="domus-btn-primary text-xs">
-              Add Column
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddCol(false);
+                  setNewColTitle("");
+                  setNewColIcon("");
+                }}
+                className="domus-btn-secondary h-10 text-xs"
+              >
+                Cancel
+              </button>
+              <button type="submit" className="domus-btn-primary h-10 text-xs">
+                Add Column
+              </button>
+            </div>
           </motion.form>
         )}
       </AnimatePresence>
@@ -499,17 +535,24 @@ export default function InteractiveBoard({
               )}
             </div>
 
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setComposerColId(null)}
-                className="domus-btn-secondary text-xs"
-              >
-                Cancel
-              </button>
-              <button type="submit" className="domus-btn-primary text-xs">
-                Pin to Board
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <AssetPickerPopover
+                value={cardIcon}
+                onChange={setCardIcon}
+                label="Attach 2.5D Sticker"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setComposerColId(null)}
+                  className="domus-btn-secondary text-xs"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="domus-btn-primary text-xs">
+                  Pin to Board
+                </button>
+              </div>
             </div>
           </motion.form>
         )}
@@ -547,10 +590,19 @@ export default function InteractiveBoard({
               {/* Column Header */}
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span
-                    className="h-3 w-3 rounded-full shadow-sm"
-                    style={{ backgroundColor: col.color }}
-                  />
+                  {col.iconAsset ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={col.iconAsset}
+                      alt=""
+                      className="h-6 w-6 rounded-lg bg-[#faf9f5] object-cover shadow-sm"
+                    />
+                  ) : (
+                    <span
+                      className="h-3 w-3 rounded-full shadow-sm"
+                      style={{ backgroundColor: col.color }}
+                    />
+                  )}
                   <h4 className="text-xs font-bold uppercase tracking-wider text-stone-700">
                     {col.title}
                   </h4>
@@ -642,15 +694,26 @@ export default function InteractiveBoard({
                         </div>
                       </div>
 
-                      <p className="mt-2 text-sm font-bold leading-snug text-stone-900">
-                        {card.title}
-                      </p>
-
-                      {card.description && (
-                        <p className="mt-1 text-xs leading-relaxed text-stone-600">
-                          {card.description}
-                        </p>
-                      )}
+                      <div className="mt-2 flex items-start gap-2.5">
+                        {card.iconAsset && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={card.iconAsset}
+                            alt=""
+                            className="h-10 w-10 shrink-0 rounded-xl bg-[#faf9f5] object-cover shadow-sm"
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold leading-snug text-stone-900">
+                            {card.title}
+                          </p>
+                          {card.description && (
+                            <p className="mt-1 text-xs leading-relaxed text-stone-600">
+                              {card.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Tags & House Gear chips */}
                       {(card.tags.length > 0 || gear) && (

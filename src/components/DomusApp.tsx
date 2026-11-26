@@ -16,6 +16,7 @@ import { MemberContext, ROLE_META } from "@/lib/rbac";
 import CalendarView from "./CalendarView";
 import CommonAreaView from "./CommonAreaView";
 import FamilyView from "./FamilyView";
+import HouseEntryway from "./HouseEntryway";
 import HouseTour from "./HouseTour";
 import LoginView from "./LoginView";
 import MemberAvatar from "./MemberAvatar";
@@ -40,7 +41,7 @@ export default function DomusApp() {
     members: [],
     demoSwitcherEnabled: true,
   });
-  const [activeTab, setActiveTab] = useState<ActiveTab>("common");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("entry");
   const [visitingRoomOwnerId, setVisitingRoomOwnerId] = useState<string | null>(
     null
   );
@@ -71,12 +72,6 @@ export default function DomusApp() {
             (k: RoomKnockDTO) => k.status === "KNOCKING"
           ).length;
           setKnockCount(pending);
-        }
-        if (
-          typeof window !== "undefined" &&
-          !window.localStorage.getItem("domus_tour_seen")
-        ) {
-          setTourOpen(true);
         }
       }
     } catch {
@@ -196,9 +191,9 @@ export default function DomusApp() {
         }}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          {/* Brand */}
+          {/* Brand (click to return to Entryway Porch) */}
           <button
-            onClick={() => handleNavigate("common")}
+            onClick={() => handleNavigate("entry")}
             className="flex shrink-0 items-center gap-3 text-left"
           >
             <motion.div
@@ -365,6 +360,15 @@ export default function DomusApp() {
             exit={{ opacity: 0, y: -8, scale: 0.992 }}
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
           >
+            {activeTab === "entry" && (
+              <HouseEntryway
+                currentMember={currentMember}
+                household={session.household}
+                knockCount={knockCount}
+                onEnter={(tab) => handleNavigate(tab)}
+                onStartTour={() => setTourOpen(true)}
+              />
+            )}
             {activeTab === "common" && (
               <CommonAreaView
                 currentMember={currentMember}
@@ -378,6 +382,7 @@ export default function DomusApp() {
                 roomOwnerId={visitingRoomOwnerId ?? currentMember.id}
                 members={session.members}
                 onReturnToMyRoom={() => setVisitingRoomOwnerId(null)}
+                onProfileChanged={loadSession}
               />
             )}
             {activeTab === "calendar" && (

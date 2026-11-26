@@ -7,6 +7,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  GripVertical,
+  Hand,
   Layers,
   Lock,
   Trash2,
@@ -27,6 +29,17 @@ interface AvailableSlot {
   startTime: string;
   endTime: string;
   label: string;
+}
+
+interface UnscheduledTask {
+  id: string;
+  title: string;
+  description: string;
+  priority: string;
+  noteColor: string;
+  resourceId: string | null;
+  iconAsset: string;
+  sourceScope: string;
 }
 
 interface CalendarViewProps {
@@ -66,6 +79,11 @@ export default function CalendarView({
   const [events, setEvents] = useState<CalendarEventDTO[]>([]);
   const [bookings, setBookings] = useState<TimeBookingDTO[]>([]);
   const [resources, setResources] = useState<HouseResourceDTO[]>([]);
+  const [unscheduledTasks, setUnscheduledTasks] = useState<UnscheduledTask[]>(
+    []
+  );
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"DAILY" | "WEEKLY" | "YEARLY">(
     "WEEKLY"
   );
@@ -109,10 +127,11 @@ export default function CalendarView({
   const resourceById = new Map(resources.map((r) => [r.id, r]));
 
   async function loadAll() {
-    const [evRes, bkRes, resRes] = await Promise.all([
+    const [evRes, bkRes, resRes, unRes] = await Promise.all([
       fetch("/api/calendar/events"),
       fetch("/api/calendar/bookings"),
       fetch("/api/resources"),
+      fetch("/api/calendar/unscheduled"),
     ]);
     if (evRes.ok) {
       const d = await evRes.json();
@@ -125,6 +144,35 @@ export default function CalendarView({
     if (resRes.ok) {
       const d = await resRes.json();
       setResources(d.resources ?? []);
+    }
+    if (unRes.ok) {
+      const d = await unRes.json();
+      setUnscheduledTasks(d.tasks ?? []);
+    }
+  }
+
+  async function scheduleUnscheduledTask(
+    cardId: string,
+    dateKey: string,
+    hour = 10
+  ) {
+    setFeedback(null);
+    const startH = String(hour).padStart(2, "0");
+    const endH = String(Math.min(22, hour + 1)).padStart(2, "0");
+    const startTime = new Date(`${dateKey}T${startH}:00:00`).toISOString();
+    const endTime = new Date(`${dateKey}T${endH}:00:00`).toISOString();
+
+    const res = await fetch(`/api/boards/cards/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dueDate: dateKey, startTime, endTime }),
+    });
+    if (res.ok) {
+      setFeedback({
+        type: "ok",
+        text: `Scheduled onto ${dateKey} at ${hour > 12 ? `${hour - 12} PM` : `${hour} AM`}!`,
+      });
+      await loadAll();
     }
   }
 
@@ -598,6 +646,64 @@ export default function CalendarView({
         </div>
       </div>
 
+      {/* Unscheduled Picked-Up & Personal Tasks Tray (Drag straight onto Calendar!) */}
+      {unscheduledTasks.length > 0 && (
+        <div className="domus-card border-terracotta-200/80 bg-gradient-to-r from-terracotta-50/70 to-amber-50/50 p-4">
+          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Hand className="h-4 w-4 text-terracotta-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                Your Picked-Up &amp; Unscheduled Tasks ({unscheduledTasks.length})
+              </h3>
+            </div>
+            <span className="text-[11px] font-medium text-stone-500">
+              Drag any task onto a day in Weekly view or an hour in Daily view to schedule it!
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            {unscheduledTasks.map((t) => (
+              <div
+                key={t.id}
+                draggable
+                onDragStart={() => setDraggingTaskId(t.id)}
+                onDragEnd={() => {
+                  setDraggingTaskId(null);
+                  setDropTargetKey(null);
+                }}
+                className="domus-tile flex cursor-grab items-center gap-2.5 px-3 py-2 active:cursor-grabbing"
+              >
+                <GripVertical className="h-3.5 w-3.5 text-stone-400" />
+                {t.iconAsset && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={t.iconAsset}
+                    alt=""
+                    className="h-7 w-7 rounded-lg object-cover"
+                  />
+                )}
+                <div>
+                  <p className="text-xs font-bold text-stone-900">{t.title}</p>
+                  <p className="text-[10px] font-semibold text-stone-500">
+                    {t.sourceScope === "COMMON"
+                      ? "Picked Up from Common Board"
+                      : "Personal Room Task"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    scheduleUnscheduledTask(t.id, toDateKey(anchorDate), 10)
+                  }
+                  className="ml-1 rounded-lg bg-stone-900 px-2 py-1 text-[10px] font-bold text-white hover:bg-terracotta-500"
+                >
+                  + Drop Today
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Main Calendar Surface (8 cols) */}
         <div className="lg:col-span-8">
@@ -641,8 +747,30 @@ export default function CalendarView({
                 {weekDays.map((d) => {
                   const key = toDateKey(d);
                   const dayEvts = eventsByDayKey.get(key) ?? [];
+                  const isDropDay = dropTargetKey === `day-${key}`;
                   return (
-                    <div key={key} className="space-y-2 p-2">
+                    <div
+                      key={key}
+                      onDragOver={(e) => {
+                        if (!draggingTaskId) return;
+                        e.preventDefault();
+                        setDropTargetKey(`day-${key}`);
+                      }}
+                      onDragLeave={() => {
+                        if (isDropDay) setDropTargetKey(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggingTaskId) {
+                          scheduleUnscheduledTask(draggingTaskId, key, 10);
+                          setDraggingTaskId(null);
+                          setDropTargetKey(null);
+                        }
+                      }}
+                      className={`space-y-2 p-2 transition-colors ${
+                        isDropDay ? "bg-terracotta-50/80 ring-2 ring-inset ring-terracotta-400" : ""
+                      }`}
+                    >
                       {dayEvts.length === 0 ? (
                         <p className="pt-8 text-center text-[10px] text-stone-300">
                           Open
@@ -707,10 +835,29 @@ export default function CalendarView({
                     : hour > 12
                       ? `${hour - 12} PM`
                       : `${hour} AM`;
+                const isDropHour = dropTargetKey === `hour-${hour}`;
                 return (
                   <div
                     key={hour}
-                    className="grid min-h-[54px] grid-cols-12 items-start bg-white px-4 py-2"
+                    onDragOver={(e) => {
+                      if (!draggingTaskId) return;
+                      e.preventDefault();
+                      setDropTargetKey(`hour-${hour}`);
+                    }}
+                    onDragLeave={() => {
+                      if (isDropHour) setDropTargetKey(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggingTaskId) {
+                        scheduleUnscheduledTask(draggingTaskId, anchorKey, hour);
+                        setDraggingTaskId(null);
+                        setDropTargetKey(null);
+                      }
+                    }}
+                    className={`grid min-h-[54px] grid-cols-12 items-start px-4 py-2 transition-colors ${
+                      isDropHour ? "bg-terracotta-50/80" : "bg-white"
+                    }`}
                   >
                     <span className="col-span-2 pt-1 text-[11px] font-bold text-stone-400">
                       {label}

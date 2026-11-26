@@ -157,6 +157,7 @@ export async function POST(request: Request) {
     description: typeof body.description === "string" ? body.description : "",
     cardType: body.cardType === "NOTE" ? "NOTE" : "TASK",
     noteColor: typeof body.noteColor === "string" ? body.noteColor : "cream",
+    iconAsset: typeof body.iconAsset === "string" ? body.iconAsset : "",
     tagsJson: JSON.stringify(tags),
     priority: ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(body.priority)
       ? body.priority

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { auditLogs, households, members } from "@/db/schema";
+import { auditLogs, households, members, roomConfigs } from "@/db/schema";
 import { getCurrentMember, hashPassword } from "@/lib/auth";
 import { generateRoomKey, getAvatarPreset } from "@/lib/avatars";
 import { can, parsePermissions } from "@/lib/rbac";
@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [rosterRows, hhRows] = await Promise.all([
+  const [rosterRows, hhRows, roomRows] = await Promise.all([
     db
       .select()
       .from(members)
@@ -24,7 +24,15 @@ export async function GET() {
       .from(households)
       .where(eq(households.id, viewer.householdId))
       .limit(1),
+    db
+      .select()
+      .from(roomConfigs)
+      .where(eq(roomConfigs.householdId, viewer.householdId)),
   ]);
+
+  const publicRoomOwners = new Set(
+    roomRows.filter((r) => Boolean(r.isPublic)).map((r) => r.ownerKey)
+  );
 
   const logs = can(viewer, "family:view_audit_log")
     ? await db
@@ -36,7 +44,8 @@ export async function GET() {
     : [];
 
   return NextResponse.json({
-    houseKey: `DOMUS-${(hhRows[0]?.id ?? "HOME").slice(-4).toUpperCase()}`,
+    houseKey: hhRows[0]?.houseKey ?? "DOMUS-HOME",
+    residenceName: hhRows[0]?.name ?? "The Domus Residence",
     members: rosterRows.map((m) => {
       const perms = parsePermissions(m.permissionsJson) as Record<
         string,
@@ -51,6 +60,7 @@ export async function GET() {
         color: m.color,
         avatarInitials: m.avatarInitials,
         avatarId: typeof perms.avatarId === "string" ? perms.avatarId : null,
+        isRoomPublic: publicRoomOwners.has(m.id),
         permissions: perms,
         createdAt: m.createdAt,
       };

@@ -223,9 +223,21 @@ export default function ListsView({ currentMember, members }: ListsViewProps) {
                 <option value="GENERAL">General</option>
               </select>
             </div>
-            <button type="submit" className="domus-btn-primary">
-              Create
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewList(false);
+                  setListTitle("");
+                }}
+                className="domus-btn-secondary text-xs"
+              >
+                Cancel
+              </button>
+              <button type="submit" className="domus-btn-primary text-xs">
+                Create
+              </button>
+            </div>
           </motion.form>
         )}
       </AnimatePresence>

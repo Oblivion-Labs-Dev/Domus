@@ -7,8 +7,10 @@ import {
   ArrowLeft,
   ArrowUp,
   BellRing,
+  Camera,
   Check,
   DoorClosed,
+  DoorOpen,
   Hand,
   Lock,
   Plus,
@@ -17,8 +19,10 @@ import {
 } from "lucide-react";
 import { ROOM_THEMES } from "@/lib/decor";
 import type { MemberContext } from "@/lib/rbac";
-import DecorStudio from "./DecorStudio";
+import AvatarEditorModal from "./AvatarEditorModal";
+import FreeformDecorCanvas from "./FreeformDecorCanvas";
 import InteractiveBoard from "./InteractiveBoard";
+import MemberAvatar from "./MemberAvatar";
 import ProgressRing25D from "./ProgressRing25D";
 import TiltCard from "./TiltCard";
 import type {
@@ -37,6 +41,7 @@ interface PersonalRoomViewProps {
   roomOwnerId: string;
   members: MemberDTO[];
   onReturnToMyRoom: () => void;
+  onProfileChanged?: () => Promise<void>;
 }
 
 export default function PersonalRoomView({
@@ -44,6 +49,7 @@ export default function PersonalRoomView({
   roomOwnerId,
   members,
   onReturnToMyRoom,
+  onProfileChanged,
 }: PersonalRoomViewProps) {
   const [config, setConfig] = useState<RoomConfigDTO | null>(null);
   const [board, setBoard] = useState<BoardDTO | null>(null);
@@ -64,6 +70,7 @@ export default function PersonalRoomView({
   const [knocks, setKnocks] = useState<RoomKnockDTO[]>([]);
   const [lockedMessage, setLockedMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
 
   // Quick tracker log
   const [logId, setLogId] = useState<string | null>(null);
@@ -133,6 +140,22 @@ export default function PersonalRoomView({
   useEffect(() => {
     loadRoom();
   }, [loadRoom, currentMember.id]);
+
+  async function handleSaveAvatar(avatarId: string) {
+    const res = await fetch("/api/auth/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarId }),
+    });
+    if (!res.ok) throw new Error("Failed");
+    if (onProfileChanged) await onProfileChanged();
+    await loadRoom();
+  }
+
+  async function handleTogglePrivacy() {
+    if (!config || !isOwnRoom) return;
+    await handleSaveConfig({ isPublic: !config.isPublic });
+  }
 
   async function handleSaveConfig(patch: Partial<RoomConfigDTO>) {
     if (!isOwnRoom) return;
@@ -264,83 +287,138 @@ export default function PersonalRoomView({
         </div>
       )}
 
-      {/* 2.5D Room Header + Decor Studio */}
-      <div
-        className={`relative overflow-hidden rounded-3xl border bg-gradient-to-br p-6 ${theme.surfaceClass}`}
-        style={{
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 0 0 rgba(212,206,192,0.85), 0 18px 36px -16px rgba(25,23,20,0.16)",
-        }}
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-white text-base font-bold text-white shadow-md"
-              style={{
-                backgroundColor: roomOwner?.color ?? currentMember.color,
-              }}
-            >
-              {roomOwner?.avatarInitials ?? currentMember.avatarInitials}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-black/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                  <Lock className="h-3 w-3" />
-                  Private Room · Knock Required
-                </span>
-              </div>
-              <h2
-                className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
-                  theme.dark ? "text-white" : "text-stone-900"
-                }`}
-              >
-                {config?.roomTitle ?? `${roomOwner?.name}'s Room`}
-              </h2>
-              <p
-                className={`mt-0.5 text-sm ${
-                  theme.dark ? "text-stone-300" : "text-stone-600"
-                }`}
-              >
-                {config?.bannerQuote ||
-                  "Arrange your boards, notes, trackers & 2.5D decor however you like."}
-              </p>
-            </div>
-          </div>
+      {/* Avatar Editor Modal (Upload Photo / 2.5D Icon / Emblem) */}
+      {isOwnRoom && (
+        <AvatarEditorModal
+          open={avatarEditorOpen}
+          initials={currentMember.avatarInitials}
+          color={currentMember.color}
+          currentAvatarId={roomOwner?.avatarId}
+          onClose={() => setAvatarEditorOpen(false)}
+          onSave={handleSaveAvatar}
+        />
+      )}
 
-          {isOwnRoom && allowedVisitors.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {allowedVisitors.map((v) => {
-                const vm = memberById.get(v.visitorId);
-                return (
-                  <div
-                    key={v.id}
-                    className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm"
-                  >
-                    <span>{vm?.name} has access</span>
+      {/* 2.5D Freeform Decoratable Personal Room Header */}
+      {config && (
+        <FreeformDecorCanvas
+          config={config}
+          readOnly={!isOwnRoom}
+          onSave={handleSaveConfig}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                disabled={!isOwnRoom}
+                onClick={() => isOwnRoom && setAvatarEditorOpen(true)}
+                title={
+                  isOwnRoom
+                    ? "Click to change avatar or upload your photo"
+                    : roomOwner?.name
+                }
+                className={`group relative shrink-0 ${
+                  isOwnRoom ? "cursor-pointer" : "cursor-default"
+                }`}
+              >
+                <MemberAvatar
+                  initials={
+                    roomOwner?.avatarInitials ?? currentMember.avatarInitials
+                  }
+                  color={roomOwner?.color ?? currentMember.color}
+                  avatarId={roomOwner?.avatarId}
+                  size="lg"
+                />
+                {isOwnRoom && (
+                  <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-stone-900 text-white shadow transition-transform group-hover:scale-110">
+                    <Camera className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {isOwnRoom ? (
                     <button
-                      onClick={() => answerKnock(v.id, "REVOKED")}
-                      className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-600 hover:bg-red-50 hover:text-red-600"
+                      type="button"
+                      onClick={handleTogglePrivacy}
+                      title="Click to toggle between Private (Knock Required) and Open Door (Public to Family)"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition hover:scale-[1.02] ${
+                        config.isPublic
+                          ? "bg-sage-100 text-sage-800 ring-1 ring-sage-300"
+                          : "bg-black/10 text-stone-800 hover:bg-black/15"
+                      }`}
                     >
-                      <DoorClosed className="h-3 w-3" />
-                      Close Door
+                      {config.isPublic ? (
+                        <>
+                          <DoorOpen className="h-3 w-3 text-sage-700" />
+                          Open Door · Public to Family (Click to Lock)
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-3 w-3" />
+                          Private · Knock Required (Click to Open)
+                        </>
+                      )}
                     </button>
-                  </div>
-                );
-              })}
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-black/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      {config.isPublic ? (
+                        <>
+                          <DoorOpen className="h-3 w-3" />
+                          Open Door · Public
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-3 w-3" />
+                          Private · Guest Pass
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <h2
+                  className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
+                    theme.dark ? "text-white" : "text-stone-900"
+                  }`}
+                >
+                  {config.roomTitle}
+                </h2>
+                <p
+                  className={`mt-0.5 text-sm ${
+                    theme.dark ? "text-stone-300" : "text-stone-600"
+                  }`}
+                >
+                  {config.bannerQuote ||
+                    "Arrange your boards, notes, trackers & drag-anywhere 2.5D decor."}
+                </p>
+              </div>
             </div>
-          )}
-        </div>
 
-        {config && (
-          <div className="mt-5 border-t border-black/10 pt-4">
-            <DecorStudio
-              config={config}
-              readOnly={!isOwnRoom}
-              onSave={handleSaveConfig}
-            />
+            {isOwnRoom && allowedVisitors.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {allowedVisitors.map((v) => {
+                  const vm = memberById.get(v.visitorId);
+                  return (
+                    <div
+                      key={v.id}
+                      className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white/95 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm"
+                    >
+                      <span>{vm?.name} has access</span>
+                      <button
+                        onClick={() => answerKnock(v.id, "REVOKED")}
+                        className="inline-flex items-center gap-1 rounded-lg bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-600 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <DoorClosed className="h-3 w-3" />
+                        Close Door
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </FreeformDecorCanvas>
+      )}
 
       {/* Incoming Knocks on Your Door */}
       {isOwnRoom && pendingKnocks.length > 0 && (
@@ -544,7 +622,14 @@ export default function PersonalRoomView({
                       className="domus-input flex-1"
                     />
                   </div>
-                  <div className="flex justify-end sm:col-span-4">
+                  <div className="flex justify-end gap-2 sm:col-span-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowNewTracker(false)}
+                      className="domus-btn-secondary text-xs"
+                    >
+                      Cancel
+                    </button>
                     <button type="submit" className="domus-btn-primary text-xs">
                       Save Tracker
                     </button>

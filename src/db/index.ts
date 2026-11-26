@@ -222,12 +222,51 @@ export async function ensureTables(): Promise<void> {
       summary TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS house_polls (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      question TEXT NOT NULL,
+      tag TEXT NOT NULL DEFAULT 'home',
+      options_json TEXT NOT NULL DEFAULT '[]',
+      created_by_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS fridge_meals (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      meal_type TEXT NOT NULL DEFAULT 'DINNER',
+      dish TEXT NOT NULL,
+      chef_id TEXT REFERENCES members(id) ON DELETE SET NULL,
+      notes TEXT DEFAULT '',
+      linked_event_id TEXT REFERENCES calendar_events(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS group_workouts (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      date TEXT NOT NULL,
+      exercises_json TEXT NOT NULL DEFAULT '[]',
+      participant_ids_json TEXT NOT NULL DEFAULT '[]',
+      completed_ids_json TEXT NOT NULL DEFAULT '[]',
+      linked_event_id TEXT REFERENCES calendar_events(id) ON DELETE SET NULL,
+      created_by_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Safe migrations for existing local SQLite databases
   const safeAlters = [
+    "ALTER TABLE households ADD COLUMN house_key TEXT NOT NULL DEFAULT 'DOMUS-HOME'",
     "ALTER TABLE calendar_events ADD COLUMN resource_id TEXT REFERENCES house_resources(id) ON DELETE SET NULL",
     "ALTER TABLE time_bookings ADD COLUMN resource_id TEXT REFERENCES house_resources(id) ON DELETE SET NULL",
+    "ALTER TABLE board_columns ADD COLUMN icon_asset TEXT DEFAULT ''",
+    "ALTER TABLE board_cards ADD COLUMN icon_asset TEXT DEFAULT ''",
+    "ALTER TABLE room_configs ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0",
   ];
   for (const sql of safeAlters) {
     try {

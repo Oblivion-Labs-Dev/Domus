@@ -179,6 +179,9 @@ export interface PlacedDecor {
   uid: string;
   assetId: string;
   label: string;
+  x?: number;
+  y?: number;
+  scale?: number;
 }
 
 export type RoomThemeId = "stone" | "sage" | "terracotta" | "butter" | "midnight";

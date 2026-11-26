@@ -10,7 +10,13 @@ export async function GET() {
   await seedIfEmpty();
   const current = await getCurrentMember();
 
-  const allHouseholds = await db.select().from(households).limit(1);
+  const allHouseholds = current
+    ? await db
+        .select()
+        .from(households)
+        .where(eq(households.id, current.householdId))
+        .limit(1)
+    : await db.select().from(households).limit(1);
   const household = allHouseholds[0] ?? null;
 
   const rosterRows = household

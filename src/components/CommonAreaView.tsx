@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { ROOM_THEMES } from "@/lib/decor";
 import type { MemberContext } from "@/lib/rbac";
-import DecorStudio from "./DecorStudio";
+import CommonSocialHub from "./CommonSocialHub";
+import FreeformDecorCanvas from "./FreeformDecorCanvas";
 import InteractiveBoard from "./InteractiveBoard";
 import ListsView from "./ListsView";
 import TiltCard from "./TiltCard";
@@ -158,81 +159,67 @@ export default function CommonAreaView({
         </motion.div>
       )}
 
-      {/* 2.5D Common Living Room Hero & Decor Shelf */}
-      <div
-        className={`relative overflow-hidden rounded-3xl border bg-gradient-to-br p-6 ${theme.surfaceClass}`}
-        style={{
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 0 0 rgba(212,206,192,0.85), 0 18px 36px -16px rgba(25,23,20,0.16)",
-        }}
-      >
-        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
-          <div className="flex items-start gap-4">
-            <motion.div
-              whileHover={{ y: -4, rotate: -2 }}
-              className="hidden h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-[#faf9f5] shadow-md sm:block"
-              style={{
-                boxShadow:
-                  "0 5px 0 0 rgba(212,206,192,0.85), 0 14px 24px -10px rgba(25,23,20,0.22)",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/assets/house-hero.png"
-                alt="Domus Home"
-                className="h-full w-full object-cover"
-              />
-            </motion.div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
-                Common Area · Shared House Wall
-              </p>
-              <h2
-                className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
-                  theme.dark ? "text-white" : "text-stone-900"
-                }`}
+      {/* 2.5D Freeform Decoratable Common Living Room Hero */}
+      {roomConfig && (
+        <FreeformDecorCanvas config={roomConfig} onSave={handleSaveRoomConfig}>
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+            <div className="flex items-start gap-4">
+              <motion.div
+                whileHover={{ y: -4, rotate: -2 }}
+                className="hidden h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-[#faf9f5] shadow-md sm:block"
+                style={{
+                  boxShadow:
+                    "0 5px 0 0 rgba(202,187,165,0.85), 0 14px 24px -10px rgba(25,21,18,0.22)",
+                }}
               >
-                {roomConfig?.roomTitle ?? "The Common Living Room"}
-              </h2>
-              <p
-                className={`mt-1 max-w-xl text-sm ${
-                  theme.dark ? "text-stone-300" : "text-stone-600"
-                }`}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/assets/house-hero.png"
+                  alt="Domus Home"
+                  className="h-full w-full object-cover"
+                />
+              </motion.div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
+                  Common Area · Shared House Wall
+                </p>
+                <h2
+                  className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
+                    theme.dark ? "text-white" : "text-stone-900"
+                  }`}
+                >
+                  {roomConfig.roomTitle}
+                </h2>
+                <p
+                  className={`mt-1 max-w-xl text-sm ${
+                    theme.dark ? "text-stone-300" : "text-stone-600"
+                  }`}
+                >
+                  {roomConfig.bannerQuote ||
+                    "Pick up unclaimed chores, pin sticky notes, drag tasks across columns, and decorate anywhere on this wall."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                onClick={() => onNavigate("room")}
+                className="domus-btn-primary whitespace-nowrap"
               >
-                {roomConfig?.bannerQuote ||
-                  "Pick up unclaimed chores, pin sticky notes, drag tasks across columns, and decorate our shared space."}
-              </p>
+                <DoorOpen className="h-4 w-4" />
+                Enter My Room
+              </button>
+              <button
+                onClick={() => onNavigate("calendar")}
+                className="domus-btn-accent whitespace-nowrap"
+              >
+                <CalendarClock className="h-4 w-4" />
+                Calendar &amp; Booking
+              </button>
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-2.5">
-            <button
-              onClick={() => onNavigate("room")}
-              className="domus-btn-primary whitespace-nowrap"
-            >
-              <DoorOpen className="h-4 w-4" />
-              Enter My Room
-            </button>
-            <button
-              onClick={() => onNavigate("calendar")}
-              className="domus-btn-accent whitespace-nowrap"
-            >
-              <CalendarClock className="h-4 w-4" />
-              Calendar &amp; Booking
-            </button>
-          </div>
-        </div>
-
-        {/* Placed 2.5D Decorations + Decor Studio */}
-        {roomConfig && (
-          <div className="mt-5 border-t border-black/5 pt-4">
-            <DecorStudio
-              config={roomConfig}
-              onSave={handleSaveRoomConfig}
-            />
-          </div>
-        )}
-      </div>
+        </FreeformDecorCanvas>
+      )}
 
       {/* Shared House Gear Strip (2.5D Tilt Cards) */}
       <div className="space-y-3">
@@ -297,6 +284,9 @@ export default function CommonAreaView({
           ))}
         </div>
       </div>
+
+      {/* Fridge Meal Notes, Group Workouts & House Votes */}
+      <CommonSocialHub currentMember={currentMember} members={members} />
 
       {/* Main Interactive Drag-and-Drop Common House Board */}
       {board && (

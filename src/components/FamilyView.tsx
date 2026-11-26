@@ -53,6 +53,9 @@ export default function FamilyView({
 }: FamilyViewProps) {
   const [members, setMembers] = useState<MemberDTO[]>([]);
   const [houseKey, setHouseKey] = useState("DOMUS-HOME");
+  const [residenceName, setResidenceName] = useState("The Domus Residence");
+  const [editingResidence, setEditingResidence] = useState(false);
+  const [residenceDraft, setResidenceDraft] = useState("");
   const [auditLogs, setAuditLogs] = useState<AuditLogDTO[]>([]);
   const [outgoingKnocks, setOutgoingKnocks] = useState<RoomKnockDTO[]>([]);
   const [feedback, setFeedback] = useState<{
@@ -87,6 +90,10 @@ export default function FamilyView({
       setMembers(d.members ?? []);
       setAuditLogs(d.auditLogs ?? []);
       if (d.houseKey) setHouseKey(d.houseKey);
+      if (d.residenceName) {
+        setResidenceName(d.residenceName);
+        setResidenceDraft(d.residenceName);
+      }
     }
     if (knockRes.ok) {
       const d = await knockRes.json();
@@ -310,6 +317,52 @@ export default function FamilyView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {currentMember.role === "HEAD" && (
+            editingResidence ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const res = await fetch("/api/auth/house", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: residenceDraft }),
+                  });
+                  if (res.ok) {
+                    setEditingResidence(false);
+                    await loadFamily();
+                    await onHouseholdChanged();
+                  }
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <input
+                  required
+                  value={residenceDraft}
+                  onChange={(e) => setResidenceDraft(e.target.value)}
+                  className="domus-input w-48 py-1.5 text-xs"
+                />
+                <button type="submit" className="domus-btn-primary py-1.5 text-xs">
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingResidence(false)}
+                  className="domus-btn-secondary py-1.5 text-xs"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingResidence(true)}
+                className="domus-btn-secondary py-2 text-xs"
+                title="Rename your residence"
+              >
+                🏠 {residenceName} (Rename)
+              </button>
+            )
+          )}
           <span className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700 shadow-sm">
             <KeyRound className="h-3.5 w-3.5 text-terracotta-500" />
             House Key: <code className="font-mono text-stone-900">{houseKey}</code>
@@ -462,8 +515,9 @@ export default function FamilyView({
         {members.map((m, idx) => {
           const isMe = m.id === currentMember.id;
           const knock = outgoingKnocks.find((k) => k.roomOwnerId === m.id);
-          const isAllowed = isMe || knock?.status === "ALLOWED";
-          const isKnocking = knock?.status === "KNOCKING";
+          const isAllowed =
+            isMe || Boolean(m.isRoomPublic) || knock?.status === "ALLOWED";
+          const isKnocking = !m.isRoomPublic && knock?.status === "KNOCKING";
 
           return (
             <motion.div
@@ -511,7 +565,11 @@ export default function FamilyView({
                       {isAllowed ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-sage-100 px-2 py-0.5 text-[10px] font-bold text-sage-700">
                           <DoorOpen className="h-3 w-3" />
-                          {isMe ? "Your Room" : "Door Open"}
+                          {isMe
+                            ? "Your Room"
+                            : m.isRoomPublic
+                              ? "Open Door (Public)"
+                              : "Door Open"}
                         </span>
                       ) : isKnocking ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">

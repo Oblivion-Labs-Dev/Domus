@@ -17,24 +17,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ownerKey = searchParams.get("ownerKey") ?? viewer.id;
 
-  if (ownerKey !== "COMMON" && ownerKey !== viewer.id) {
-    const knocks = await db
-      .select()
-      .from(roomKnocks)
-      .where(eq(roomKnocks.householdId, viewer.householdId));
-
-    if (!canEnterRoom(viewer.id, ownerKey, knocks)) {
-      return NextResponse.json(
-        {
-          locked: true,
-          error:
-            "This room is private. Knock on the door with a message to request a visit.",
-        },
-        { status: 403 }
-      );
-    }
-  }
-
   const cfgRows = await db
     .select()
     .from(roomConfigs)
@@ -45,6 +27,27 @@ export async function GET(request: Request) {
       )
     )
     .limit(1);
+
+  if (ownerKey !== "COMMON" && ownerKey !== viewer.id) {
+    const isRoomPublic = Boolean(cfgRows[0]?.isPublic);
+    if (!isRoomPublic) {
+      const knocks = await db
+        .select()
+        .from(roomKnocks)
+        .where(eq(roomKnocks.householdId, viewer.householdId));
+
+      if (!canEnterRoom(viewer.id, ownerKey, knocks)) {
+        return NextResponse.json(
+          {
+            locked: true,
+            error:
+              "This room is private. Knock on the door with a message to request a visit.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+  }
 
   let config = cfgRows[0];
   if (!config) {
@@ -58,6 +61,7 @@ export async function GET(request: Request) {
         ownerKey === "COMMON" ? "The Common Living Room" : "My Personal Room",
       theme: "stone",
       bannerQuote: "Arrange your boards, notes & decor however you like.",
+      isPublic: false,
       layoutJson: JSON.stringify(["board", "trackers"]),
       decorItemsJson: JSON.stringify([
         { uid: "d_init", assetId: "decor-plant", label: "Desk Plant" },
@@ -130,6 +134,7 @@ export async function GET(request: Request) {
       roomTitle: config.roomTitle,
       theme: config.theme,
       bannerQuote: config.bannerQuote ?? "",
+      isPublic: Boolean(config.isPublic),
       layout: safeParse(config.layoutJson, ["board", "trackers"]),
       decorItems: safeParse(config.decorItemsJson, []),
     },
@@ -196,6 +201,7 @@ export async function PATCH(request: Request) {
   if (typeof body.roomTitle === "string") updates.roomTitle = body.roomTitle.slice(0, 80);
   if (typeof body.theme === "string") updates.theme = body.theme;
   if (typeof body.bannerQuote === "string") updates.bannerQuote = body.bannerQuote.slice(0, 160);
+  if (typeof body.isPublic === "boolean") updates.isPublic = body.isPublic;
   if (Array.isArray(body.layout)) updates.layoutJson = JSON.stringify(body.layout);
   if (Array.isArray(body.decorItems)) updates.decorItemsJson = JSON.stringify(body.decorItems);
 

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { boardCards, boardColumns, boards, roomKnocks } from "@/db/schema";
+import { boardCards, boardColumns, boards, roomConfigs, roomKnocks } from "@/db/schema";
 import { seedIfEmpty } from "@/db/seed";
 import { getCurrentMember } from "@/lib/auth";
 import { can, canEnterRoom } from "@/lib/rbac";
@@ -19,11 +19,25 @@ export async function GET(request: Request) {
   const ownerId = searchParams.get("ownerId") ?? viewer.id;
 
   if (scope === "PERSONAL" && ownerId !== viewer.id) {
-    const knocks = await db
-      .select()
-      .from(roomKnocks)
-      .where(eq(roomKnocks.householdId, viewer.householdId));
-    if (!canEnterRoom(viewer.id, ownerId, knocks)) {
+    const [cfgRows, knocks] = await Promise.all([
+      db
+        .select()
+        .from(roomConfigs)
+        .where(
+          and(
+            eq(roomConfigs.householdId, viewer.householdId),
+            eq(roomConfigs.ownerKey, ownerId)
+          )
+        )
+        .limit(1),
+      db
+        .select()
+        .from(roomKnocks)
+        .where(eq(roomKnocks.householdId, viewer.householdId)),
+    ]);
+
+    const isRoomPublic = Boolean(cfgRows[0]?.isPublic);
+    if (!isRoomPublic && !canEnterRoom(viewer.id, ownerId, knocks)) {
       return NextResponse.json(
         { error: "Door is closed. Knock and wait for permission to visit this room." },
         { status: 403 }
@@ -165,6 +179,7 @@ export async function POST(request: Request) {
     householdId: actor.householdId,
     title: String(body.title).slice(0, 48),
     color: typeof body.color === "string" ? body.color : "#4f7c5b",
+    iconAsset: typeof body.iconAsset === "string" ? body.iconAsset : "",
     position: existingCols.length,
   });
 
