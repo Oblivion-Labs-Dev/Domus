@@ -118,7 +118,7 @@ export interface RoomConfigDTO {
   theme: RoomThemeId;
   bannerQuote: string;
   isPublic?: boolean;
-  layout: string[];
+  layout: unknown[];
   decorItems: PlacedDecor[];
 }
 

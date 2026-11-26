@@ -2,28 +2,129 @@
 @tailwind components;
 @tailwind utilities;
 
+:root,
+[data-palette="botanical"] {
+  --domus-bg: #dbeae2;
+  --domus-bg-glow-1: rgba(217, 83, 47, 0.14);
+  --domus-bg-glow-2: rgba(28, 69, 54, 0.16);
+  --domus-bg-dot: rgba(28, 69, 54, 0.18);
+  --domus-surface: #ffffff;
+  --domus-surface-sub: #f2f8f5;
+  --domus-border: #bdd6c8;
+  --domus-bevel: #9ec2ae;
+  --domus-header-bg: rgba(24, 59, 46, 0.94);
+  --domus-header-text: #f5fbf7;
+  --domus-accent: #d9532f;
+  --domus-accent-deep: #9c3318;
+  --domus-ink: #132a21;
+}
+
+[data-palette="coastal"] {
+  --domus-bg: #dce7f3;
+  --domus-bg-glow-1: rgba(217, 119, 6, 0.14);
+  --domus-bg-glow-2: rgba(27, 54, 93, 0.16);
+  --domus-bg-dot: rgba(27, 54, 93, 0.17);
+  --domus-surface: #ffffff;
+  --domus-surface-sub: #f2f6fb;
+  --domus-border: #bed0e4;
+  --domus-bevel: #9bb5d1;
+  --domus-header-bg: rgba(23, 46, 82, 0.95);
+  --domus-header-text: #f4f8fc;
+  --domus-accent: #d97706;
+  --domus-accent-deep: #9a4f04;
+  --domus-ink: #132540;
+}
+
+[data-palette="espresso"] {
+  --domus-bg: #e9dfd0;
+  --domus-bg-glow-1: rgba(201, 76, 36, 0.16);
+  --domus-bg-glow-2: rgba(59, 110, 82, 0.14);
+  --domus-bg-dot: rgba(66, 48, 36, 0.18);
+  --domus-surface: #fffdf9;
+  --domus-surface-sub: #f7f1e7;
+  --domus-border: #d5c5ae;
+  --domus-bevel: #bda88a;
+  --domus-header-bg: rgba(41, 30, 24, 0.95);
+  --domus-header-text: #fdf8f2;
+  --domus-accent: #c94c24;
+  --domus-accent-deep: #8c3012;
+  --domus-ink: #241913;
+}
+
+[data-palette="midnight"] {
+  --domus-bg: #0f172a;
+  --domus-bg-glow-1: rgba(249, 115, 22, 0.18);
+  --domus-bg-glow-2: rgba(16, 185, 129, 0.16);
+  --domus-bg-dot: rgba(148, 163, 184, 0.16);
+  --domus-surface: #1e293b;
+  --domus-surface-sub: #162032;
+  --domus-border: #334155;
+  --domus-bevel: #0b1120;
+  --domus-header-bg: rgba(15, 23, 42, 0.94);
+  --domus-header-text: #f8fafc;
+  --domus-accent: #f97316;
+  --domus-accent-deep: #c2410c;
+  --domus-ink: #f8fafc;
+}
+
 @layer base {
   body {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    background-color: #f4eee3;
+    background-color: var(--domus-bg);
+    color: var(--domus-ink);
     background-image:
-      radial-gradient(circle at 10% 6%, rgba(212, 90, 51, 0.13), transparent 36%),
-      radial-gradient(circle at 90% 10%, rgba(59, 110, 82, 0.14), transparent 38%),
-      radial-gradient(circle at 50% 95%, rgba(54, 85, 120, 0.1), transparent 42%),
-      radial-gradient(rgba(115, 102, 85, 0.16) 1px, transparent 1px);
-    background-size: 100% 100%, 100% 100%, 100% 100%, 26px 26px;
+      radial-gradient(circle at 12% 8%, var(--domus-bg-glow-1), transparent 36%),
+      radial-gradient(circle at 88% 12%, var(--domus-bg-glow-2), transparent 38%),
+      radial-gradient(var(--domus-bg-dot) 1.1px, transparent 1.1px);
+    background-size: 100% 100%, 100% 100%, 24px 24px;
     background-attachment: fixed;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 }
 
-/* 2.5D Tactile Warm Ivory Architectural Surface */
+/* Midnight readability helpers for cards */
+[data-palette="midnight"] .domus-card,
+[data-palette="midnight"] .domus-tile {
+  color: #f1f5f9;
+}
+
+[data-palette="midnight"] .text-stone-900,
+[data-palette="midnight"] .text-stone-800 {
+  color: #f8fafc !important;
+}
+
+[data-palette="midnight"] .text-stone-700,
+[data-palette="midnight"] .text-stone-600 {
+  color: #cbd5e1 !important;
+}
+
+[data-palette="midnight"] .text-stone-500,
+[data-palette="midnight"] .text-stone-400 {
+  color: #94a3b8 !important;
+}
+
+[data-palette="midnight"] .bg-white,
+[data-palette="midnight"] .bg-stone-50,
+[data-palette="midnight"] .bg-stone-100 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-palette="midnight"] .domus-input {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+/* 2.5D Sculpted Architectural Card */
 .domus-card {
-  @apply relative rounded-2xl border border-stone-200/90 bg-[#fffdf9]/95 backdrop-blur-sm transition-all duration-300;
+  @apply relative rounded-2xl backdrop-blur-sm transition-all duration-300;
+  background-color: var(--domus-surface);
+  border: 1px solid var(--domus-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 3px 0 0 rgba(202, 187, 165, 0.85),
-    0 12px 28px -12px rgba(25, 21, 18, 0.12),
-    0 2px 6px -2px rgba(25, 21, 18, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 4px 0 0 var(--domus-bevel),
+    0 14px 30px -12px rgba(15, 23, 42, 0.16);
 }
 
 .domus-card-interactive {
@@ -32,104 +133,86 @@
 
 .domus-card-interactive:hover {
   transform: translateY(-4px);
-  border-color: rgba(158, 142, 120, 0.8);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 5px 0 0 rgba(202, 187, 165, 0.95),
-    0 24px 40px -14px rgba(25, 21, 18, 0.18),
-    0 4px 10px -2px rgba(25, 21, 18, 0.07);
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 6px 0 0 var(--domus-bevel),
+    0 24px 40px -14px rgba(15, 23, 42, 0.22);
 }
 
 /* 2.5D Beveled Sub-Tile */
 .domus-tile {
-  @apply relative rounded-xl border border-stone-200/90 bg-gradient-to-b from-[#fffdf9] to-stone-50/90 transition-all duration-200;
+  @apply relative rounded-xl transition-all duration-200;
+  background-color: var(--domus-surface-sub);
+  border: 1px solid var(--domus-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 2px 0 0 rgba(212, 200, 182, 0.9),
-    0 5px 14px -6px rgba(25, 21, 18, 0.09);
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 2px 0 0 var(--domus-bevel),
+    0 6px 14px -6px rgba(15, 23, 42, 0.11);
 }
 
 .domus-tile:hover {
   transform: translateY(-2px);
-  border-color: rgba(158, 142, 120, 0.75);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 4px 0 0 rgba(202, 187, 165, 0.95),
-    0 14px 24px -10px rgba(25, 21, 18, 0.15);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 4px 0 0 var(--domus-bevel),
+    0 14px 24px -10px rgba(15, 23, 42, 0.18);
 }
 
 /* 2.5D Tactile Push Buttons */
 .domus-btn-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-stone-800 to-stone-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
     0 4px 0 0 #090706,
-    0 10px 20px -6px rgba(25, 21, 18, 0.38);
+    0 10px 20px -6px rgba(15, 23, 42, 0.38);
 }
 
 .domus-btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 6px 0 0 #090706,
-    0 14px 24px -6px rgba(25, 21, 18, 0.45);
 }
 
 .domus-btn-primary:active:not(:disabled) {
   transform: translateY(2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 1px 0 0 #090706,
-    0 4px 8px -4px rgba(25, 21, 18, 0.32);
+  box-shadow: 0 1px 0 0 #090706;
 }
 
 .domus-btn-accent {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-terracotta-400 to-terracotta-500 px-4 py-2 text-sm font-semibold text-white transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  background-color: var(--domus-accent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 4px 0 0 #8f3216,
-    0 10px 22px -6px rgba(212, 90, 51, 0.45);
+    0 4px 0 0 var(--domus-accent-deep),
+    0 10px 22px -6px rgba(217, 83, 47, 0.45);
 }
 
 .domus-btn-accent:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    0 6px 0 0 #8f3216,
-    0 16px 26px -6px rgba(212, 90, 51, 0.52);
+  filter: brightness(1.05);
 }
 
 .domus-btn-accent:active:not(:disabled) {
   transform: translateY(2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 1px 0 0 #8f3216,
-    0 4px 10px -4px rgba(212, 90, 51, 0.38);
+  box-shadow: 0 1px 0 0 var(--domus-accent-deep);
 }
 
 .domus-btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-gradient-to-b from-[#fffdf9] to-stone-50 px-3.5 py-2 text-sm font-semibold text-stone-700 transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  background-color: var(--domus-surface);
+  color: var(--domus-ink);
+  border: 1px solid var(--domus-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 3px 0 0 #cabba5,
-    0 6px 12px -6px rgba(25, 21, 18, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 3px 0 0 var(--domus-bevel),
+    0 6px 12px -6px rgba(15, 23, 42, 0.14);
 }
 
 .domus-btn-secondary:hover:not(:disabled) {
   transform: translateY(-2px);
-  @apply border-stone-300 text-stone-900;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 5px 0 0 #bda98f,
-    0 10px 18px -6px rgba(25, 21, 18, 0.18);
 }
 
 .domus-btn-secondary:active:not(:disabled) {
   transform: translateY(1.5px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 0 0 #cabba5,
-    0 3px 6px -4px rgba(25, 21, 18, 0.14);
+  box-shadow: 0 1px 0 0 var(--domus-bevel);
 }
 
 .domus-input {

@@ -9,9 +9,11 @@ import {
   Home,
   LayoutGrid,
   LogOut,
+  Palette,
   Shield,
   Users,
 } from "lucide-react";
+import { GLOBAL_PALETTES, GlobalPaletteId } from "@/lib/palettes";
 import { MemberContext, ROLE_META } from "@/lib/rbac";
 import CalendarView from "./CalendarView";
 import CommonAreaView from "./CommonAreaView";
@@ -50,6 +52,27 @@ export default function DomusApp() {
   );
   const [knockCount, setKnockCount] = useState(0);
   const [tourOpen, setTourOpen] = useState(false);
+  const [palette, setPalette] = useState<GlobalPaletteId>("botanical");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const saved =
+      typeof window !== "undefined"
+        ? (window.localStorage.getItem("domus_palette") as GlobalPaletteId | null)
+        : null;
+    const initial = saved ?? "botanical";
+    setPalette(initial);
+    document.documentElement.setAttribute("data-palette", initial);
+  }, []);
+
+  function handleSelectPalette(next: GlobalPaletteId) {
+    setPalette(next);
+    document.documentElement.setAttribute("data-palette", next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("domus_palette", next);
+    }
+    setPaletteOpen(false);
+  }
 
   const loadSession = useCallback(async () => {
     try {
@@ -182,12 +205,13 @@ export default function DomusApp() {
         onNavigate={(tab) => handleNavigate(tab)}
       />
 
-      {/* Crisp Single-Line 2.5D Sculpted Header */}
+      {/* Rich Sculpted 2.5D Header Bar (adapts to active palette!) */}
       <header
-        className="sticky top-0 z-40 border-b border-stone-200/80 bg-white/90 backdrop-blur-md"
+        className="sticky top-0 z-40 border-b border-white/10 backdrop-blur-md transition-colors duration-300"
         style={{
-          boxShadow:
-            "0 2px 0 0 rgba(230,226,216,0.75), 0 12px 30px -14px rgba(25,23,20,0.12)",
+          backgroundColor: "var(--domus-header-bg)",
+          color: "var(--domus-header-text)",
+          boxShadow: "0 4px 0 0 rgba(0,0,0,0.22), 0 14px 32px -12px rgba(0,0,0,0.3)",
         }}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -199,29 +223,27 @@ export default function DomusApp() {
             <motion.div
               whileHover={{ y: -2, rotate: -5 }}
               whileTap={{ y: 1, scale: 0.95 }}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-stone-800 to-stone-900 text-white"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
               style={{
+                backgroundColor: "var(--domus-accent)",
                 boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 0 0 #0b0a08, 0 8px 16px -6px rgba(25,23,20,0.35)",
+                  "inset 0 1px 0 rgba(255,255,255,0.3), 0 3px 0 0 var(--domus-accent-deep)",
               }}
             >
               <Home className="h-4 w-4" />
             </motion.div>
             <div className="flex items-center gap-2">
-              <span className="whitespace-nowrap text-base font-bold tracking-tight text-stone-900">
+              <span className="whitespace-nowrap text-base font-bold tracking-tight text-white">
                 Domus
               </span>
-              <span className="hidden whitespace-nowrap rounded-full border border-stone-200 bg-stone-100/90 px-2.5 py-0.5 text-[11px] font-semibold text-stone-600 xl:inline">
+              <span className="hidden whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 xl:inline">
                 {session.household?.name ?? "Household"}
               </span>
             </div>
           </button>
 
           {/* Desktop 2.5D Single-Line Spring Pill Nav */}
-          <nav
-            className="hidden shrink-0 items-center gap-1 rounded-2xl border border-stone-200/90 bg-stone-100/80 p-1.5 md:flex"
-            style={{ boxShadow: "inset 0 2px 4px rgba(25,23,20,0.05)" }}
-          >
+          <nav className="hidden shrink-0 items-center gap-1 rounded-2xl border border-white/15 bg-black/20 p-1.5 md:flex">
             {navItems.map((item) => {
               const active = activeTab === item.id;
               return (
@@ -231,7 +253,7 @@ export default function DomusApp() {
                   className={`relative inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors ${
                     active
                       ? "text-white"
-                      : "text-stone-600 hover:text-stone-900"
+                      : "text-white/75 hover:text-white"
                   }`}
                 >
                   {active && (
@@ -242,10 +264,11 @@ export default function DomusApp() {
                         stiffness: 420,
                         damping: 32,
                       }}
-                      className="absolute inset-0 rounded-xl bg-gradient-to-b from-stone-800 to-stone-900"
+                      className="absolute inset-0 rounded-xl"
                       style={{
+                        backgroundColor: "var(--domus-accent)",
                         boxShadow:
-                          "inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 0 0 #0b0a08, 0 8px 14px -5px rgba(25,23,20,0.35)",
+                          "inset 0 1px 0 rgba(255,255,255,0.3), 0 3px 0 0 var(--domus-accent-deep)",
                       }}
                     />
                   )}
@@ -253,7 +276,7 @@ export default function DomusApp() {
                     {item.icon}
                     {item.label}
                     {item.badge && (
-                      <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-terracotta-500 px-1 text-[10px] font-bold text-white">
+                      <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-stone-900">
                         {item.badge}
                       </span>
                     )}
@@ -263,36 +286,73 @@ export default function DomusApp() {
             })}
           </nav>
 
-          {/* Right Controls: Tour + Role Switcher + Avatar + Logout */}
-          <div className="flex shrink-0 items-center gap-2">
-            <motion.button
-              whileHover={{ y: -1.5 }}
-              whileTap={{ y: 1 }}
+          {/* Right Controls: Palette Picker + Tour + Role Switcher + Avatar + Logout */}
+          <div className="relative flex shrink-0 items-center gap-2">
+            {/* Live Color Theme Switcher */}
+            <div className="relative">
+              <button
+                onClick={() => setPaletteOpen((v) => !v)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+                title="Change color palette"
+              >
+                <Palette className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Colors</span>
+              </button>
+              {paletteOpen && (
+                <div className="domus-card absolute right-0 top-11 z-50 w-64 space-y-2 p-3 text-stone-900 shadow-2xl">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
+                    Choose House Color Palette
+                  </p>
+                  {GLOBAL_PALETTES.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSelectPalette(p.id)}
+                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
+                        palette === p.id
+                          ? "border-terracotta-500 bg-terracotta-50/70"
+                          : "border-stone-200 hover:border-stone-400"
+                      }`}
+                    >
+                      <span>{p.name}</span>
+                      <span className="flex items-center gap-1">
+                        {p.swatches.map((hex, i) => (
+                          <span
+                            key={i}
+                            className="h-3.5 w-3.5 rounded-full border border-black/15"
+                            style={{ backgroundColor: hex }}
+                          />
+                        ))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
               onClick={() => setTourOpen(true)}
-              className="domus-btn-secondary shrink-0 whitespace-nowrap px-3 py-1.5 text-xs"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
               title="Launch guided house tour"
             >
-              <Compass className="h-3.5 w-3.5 text-terracotta-500" />
+              <Compass className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Tour</span>
-            </motion.button>
+            </button>
 
             {session.demoSwitcherEnabled && session.members.length > 1 && (
-              <div
-                className="hidden items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 lg:flex"
-                style={{
-                  boxShadow:
-                    "inset 0 1px 0 #fff, 0 2px 0 0 rgba(212,206,192,0.85)",
-                }}
-              >
-                <Shield className="h-3.5 w-3.5 shrink-0 text-terracotta-500" />
+              <div className="hidden items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 lg:flex">
+                <Shield className="h-3.5 w-3.5 shrink-0 text-amber-300" />
                 <select
                   aria-label="Switch active family member"
                   value={currentMember.id}
                   onChange={(e) => handleDemoRoleSwitch(e.target.value)}
-                  className="cursor-pointer bg-transparent text-xs font-semibold text-stone-800 focus:outline-none"
+                  className="cursor-pointer bg-transparent text-xs font-semibold text-white focus:outline-none"
                 >
                   {session.members.map((m) => (
-                    <option key={m.id} value={m.id}>
+                    <option
+                      key={m.id}
+                      value={m.id}
+                      className="text-stone-900"
+                    >
                       {m.name} ({ROLE_META[m.role]?.badge ?? m.role})
                     </option>
                   ))}
@@ -316,15 +376,13 @@ export default function DomusApp() {
               />
             </button>
 
-            <motion.button
-              whileHover={{ y: -1.5 }}
-              whileTap={{ y: 1 }}
+            <button
               onClick={handleLogout}
               title="Sign out"
-              className="domus-btn-secondary shrink-0 px-2.5 py-2"
+              className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20"
             >
               <LogOut className="h-4 w-4" />
-            </motion.button>
+            </button>
           </div>
         </div>
 

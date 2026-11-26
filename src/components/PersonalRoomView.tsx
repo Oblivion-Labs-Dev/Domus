@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowDown,
   ArrowLeft,
-  ArrowUp,
   BellRing,
   Camera,
   Check,
@@ -24,6 +22,11 @@ import FreeformDecorCanvas from "./FreeformDecorCanvas";
 import InteractiveBoard from "./InteractiveBoard";
 import MemberAvatar from "./MemberAvatar";
 import ProgressRing25D from "./ProgressRing25D";
+import SpaceBuilder, {
+  AvailableBlockOption,
+  normalizeSpaceBlocks,
+  SpaceBlockItem,
+} from "./SpaceBuilder";
 import TiltCard from "./TiltCard";
 import type {
   BoardCardDTO,
@@ -167,20 +170,6 @@ export default function PersonalRoomView({
     await loadRoom();
   }
 
-  async function moveSection(sectionKey: string, dir: -1 | 1) {
-    if (!config || !isOwnRoom) return;
-    const current =
-      config.layout.length > 0 ? [...config.layout] : ["board", "trackers"];
-    const idx = current.indexOf(sectionKey);
-    if (idx < 0) return;
-    const targetIdx = idx + dir;
-    if (targetIdx < 0 || targetIdx >= current.length) return;
-    const temp = current[targetIdx];
-    current[targetIdx] = current[idx];
-    current[idx] = temp;
-    await handleSaveConfig({ layout: current });
-  }
-
   async function answerKnock(
     knockId: string,
     status: "ALLOWED" | "DECLINED" | "REVOKED"
@@ -260,10 +249,20 @@ export default function PersonalRoomView({
   }
 
   const theme = ROOM_THEMES[config?.theme ?? "stone"] ?? ROOM_THEMES.stone;
-  const sectionOrder =
-    config?.layout && config.layout.length > 0
-      ? config.layout
-      : ["board", "trackers"];
+  const DEFAULT_ROOM_BLOCKS: SpaceBlockItem[] = [
+    { id: "blk_claimed", type: "claimed", span: 12 },
+    { id: "blk_board", type: "board", span: 12 },
+    { id: "blk_trackers", type: "trackers", span: 12 },
+  ];
+  const ROOM_AVAILABLE_BLOCKS: AvailableBlockOption[] = [
+    { type: "board", label: "Personal Board", defaultSpan: 12 },
+    { type: "trackers", label: "Exercise, Diet & Life Trackers", defaultSpan: 12 },
+    { type: "claimed", label: "Picked-Up House Tasks", defaultSpan: 6 },
+  ];
+  const roomBlocks = normalizeSpaceBlocks(
+    config?.layout ?? [],
+    DEFAULT_ROOM_BLOCKS
+  );
   const pendingKnocks = knocks.filter((k) => k.status === "KNOCKING");
   const allowedVisitors = knocks.filter((k) => k.status === "ALLOWED");
 
@@ -464,271 +463,247 @@ export default function PersonalRoomView({
         </div>
       )}
 
-      {/* Claimed Common House Tasks Strip */}
-      {claimedTasks.length > 0 && (
-        <div className="domus-card p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Hand className="h-4 w-4 text-terracotta-500" />
-            <h3 className="text-sm font-bold text-stone-900">
-              House Tasks Picked Up from the Common Board
-            </h3>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {claimedTasks.map((t) => (
-              <div
-                key={t.id}
-                className="domus-tile flex items-center justify-between gap-2 p-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-stone-900">
-                    {t.title}
-                  </p>
-                  <p className="text-[11px] text-stone-500">
-                    {t.dueDate ? `Scheduled: ${t.dueDate}` : "Unscheduled"}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-md bg-terracotta-100 px-2 py-0.5 text-[10px] font-bold text-terracotta-700">
-                  {t.priority}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Flexible Reorderable Room Sections */}
-      {sectionOrder.map((section, idx) => {
-        if (section === "board" && board) {
-          return (
-            <div key="board" className="domus-card space-y-3 p-5">
-              {isOwnRoom && (
-                <div className="flex items-center justify-end gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-                    Arrange Room:
-                  </span>
-                  <button
-                    disabled={idx === 0}
-                    onClick={() => moveSection("board", -1)}
-                    className="rounded-lg border border-stone-200 p-1 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
-                    title="Move section up"
-                  >
-                    <ArrowUp className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    disabled={idx === sectionOrder.length - 1}
-                    onClick={() => moveSection("board", 1)}
-                    className="rounded-lg border border-stone-200 p-1 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
-                    title="Move section down"
-                  >
-                    <ArrowDown className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
-              <InteractiveBoard
-                board={board}
-                columns={columns}
-                cards={cards}
-                members={members}
-                resources={resources}
-                currentMember={currentMember}
-                readOnly={!isOwnRoom}
-                onRefresh={loadRoom}
-              />
-            </div>
-          );
-        }
-
-        if (section === "trackers") {
-          return (
-            <div key="trackers" className="domus-card space-y-4 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-base font-bold text-stone-900">
-                    Personal Exercise, Diet &amp; Life Plan Trackers
+      {/* Full Drag-and-Drop Modular Room Builder (Drag Boards, Trackers, Claimed Tasks & Custom Notes Anywhere!) */}
+      <SpaceBuilder
+        blocks={roomBlocks}
+        availableBlocks={ROOM_AVAILABLE_BLOCKS}
+        readOnly={!isOwnRoom}
+        onChangeBlocks={(next) => handleSaveConfig({ layout: next })}
+        renderBlock={(block) => {
+          if (block.type === "claimed") {
+            return (
+              <div className="domus-card p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Hand className="h-4 w-4 text-terracotta-500" />
+                  <h3 className="text-sm font-bold text-stone-900">
+                    House Tasks Picked Up from Common Board
                   </h3>
-                  <p className="text-xs text-stone-500">
-                    Your workouts, yoga streaks, hydration, and driving lesson
-                    hours
+                </div>
+                {claimedTasks.length === 0 ? (
+                  <p className="rounded-xl bg-stone-50 p-3 text-xs text-stone-500">
+                    No claimed house tasks yet — pick up any open task in the
+                    Common Area!
                   </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isOwnRoom && (
-                    <>
-                      <button
-                        onClick={() => setShowNewTracker((v) => !v)}
-                        className="domus-btn-secondary text-xs"
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {claimedTasks.map((t) => (
+                      <div
+                        key={t.id}
+                        className="domus-tile flex items-center justify-between gap-2 p-3"
                       >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add Tracker
-                      </button>
-                      <button
-                        disabled={idx === 0}
-                        onClick={() => moveSection("trackers", -1)}
-                        className="rounded-lg border border-stone-200 p-1 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
-                        title="Move section up"
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        disabled={idx === sectionOrder.length - 1}
-                        onClick={() => moveSection("trackers", 1)}
-                        className="rounded-lg border border-stone-200 p-1 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
-                        title="Move section down"
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {showNewTracker && isOwnRoom && (
-                <form
-                  onSubmit={handleAddTracker}
-                  className="grid gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:grid-cols-4"
-                >
-                  <input
-                    required
-                    value={trkTitle}
-                    onChange={(e) => setTrkTitle(e.target.value)}
-                    placeholder="Tracker title (e.g., Yoga, Driving)"
-                    className="domus-input sm:col-span-2"
-                  />
-                  <select
-                    value={trkType}
-                    onChange={(e) =>
-                      setTrkType(
-                        e.target.value as "EXERCISE" | "DIET" | "LIFE_PLAN"
-                      )
-                    }
-                    className="domus-input"
-                  >
-                    <option value="EXERCISE">Exercise</option>
-                    <option value="DIET">Diet</option>
-                    <option value="LIFE_PLAN">Life Plan</option>
-                  </select>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={trkTarget}
-                      onChange={(e) => setTrkTarget(Number(e.target.value))}
-                      className="domus-input w-20"
-                    />
-                    <input
-                      value={trkUnit}
-                      onChange={(e) => setTrkUnit(e.target.value)}
-                      placeholder="unit"
-                      className="domus-input flex-1"
-                    />
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold text-stone-900">
+                            {t.title}
+                          </p>
+                          <p className="text-[11px] text-stone-500">
+                            {t.dueDate
+                              ? `Scheduled: ${t.dueDate}`
+                              : "Unscheduled (drag onto Calendar!)"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-md bg-terracotta-100 px-2 py-0.5 text-[10px] font-bold text-terracotta-700">
+                          {t.priority}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex justify-end gap-2 sm:col-span-4">
+                )}
+              </div>
+            );
+          }
+
+          if (block.type === "board" && board) {
+            return (
+              <div className="domus-card p-5">
+                <InteractiveBoard
+                  board={board}
+                  columns={columns}
+                  cards={cards}
+                  members={members}
+                  resources={resources}
+                  currentMember={currentMember}
+                  readOnly={!isOwnRoom}
+                  onRefresh={loadRoom}
+                />
+              </div>
+            );
+          }
+
+          if (block.type === "trackers") {
+            return (
+              <div className="domus-card space-y-4 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-bold text-stone-900">
+                      Personal Exercise, Diet &amp; Life Plan Trackers
+                    </h3>
+                    <p className="text-xs text-stone-500">
+                      Workouts, yoga streaks, hydration &amp; driving lesson
+                      hours
+                    </p>
+                  </div>
+                  {isOwnRoom && (
                     <button
-                      type="button"
-                      onClick={() => setShowNewTracker(false)}
+                      onClick={() => setShowNewTracker((v) => !v)}
                       className="domus-btn-secondary text-xs"
                     >
-                      Cancel
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Tracker
                     </button>
-                    <button type="submit" className="domus-btn-primary text-xs">
-                      Save Tracker
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {trackers.length === 0 ? (
-                <p className="rounded-xl bg-stone-50 p-4 text-xs text-stone-500">
-                  No personal trackers yet. Click “Add Tracker” to start tracking
-                  exercise, diet, yoga, or driving hours!
-                </p>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {trackers.map((trk) => {
-                    const pct = Math.min(
-                      100,
-                      Math.round((trk.currentValue / trk.targetValue) * 100)
-                    );
-                    return (
-                      <TiltCard
-                        key={trk.id}
-                        maxTilt={5}
-                        lift={4}
-                        className="flex flex-col justify-between p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-                              {trk.cadence} · {trk.category}
-                            </span>
-                            <h4 className="text-sm font-bold text-stone-900">
-                              {trk.title}
-                            </h4>
-                            <p className="mt-1 text-xs font-semibold text-stone-600">
-                              {trk.currentValue} / {trk.targetValue} {trk.unit}
-                            </p>
-                          </div>
-                          <ProgressRing25D
-                            percent={pct}
-                            color={roomOwner?.color ?? "#4f7c5b"}
-                            size={50}
-                            strokeWidth={5}
-                          />
-                        </div>
-
-                        {isOwnRoom && (
-                          <div className="mt-3 border-t border-stone-100 pt-2.5">
-                            {logId === trk.id ? (
-                              <form
-                                onSubmit={(e) => handleLogProgress(e, trk.id)}
-                                className="flex gap-1.5"
-                              >
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  min="0.1"
-                                  value={logVal}
-                                  onChange={(e) => setLogVal(e.target.value)}
-                                  className="domus-input w-16 py-1 text-xs"
-                                />
-                                <input
-                                  value={logNote}
-                                  onChange={(e) => setLogNote(e.target.value)}
-                                  placeholder="Note..."
-                                  className="domus-input flex-1 py-1 text-xs"
-                                />
-                                <button
-                                  type="submit"
-                                  className="domus-btn-primary px-2.5 py-1 text-xs"
-                                >
-                                  Add
-                                </button>
-                              </form>
-                            ) : (
-                              <motion.button
-                                whileTap={{ scale: 0.96 }}
-                                onClick={() => {
-                                  setLogId(trk.id);
-                                  setLogVal("1");
-                                }}
-                                className="domus-btn-secondary w-full py-1.5 text-xs"
-                              >
-                                + Log {trk.unit}
-                              </motion.button>
-                            )}
-                          </div>
-                        )}
-                      </TiltCard>
-                    );
-                  })}
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        }
 
-        return null;
-      })}
+                {showNewTracker && isOwnRoom && (
+                  <form
+                    onSubmit={handleAddTracker}
+                    className="grid gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:grid-cols-4"
+                  >
+                    <input
+                      required
+                      value={trkTitle}
+                      onChange={(e) => setTrkTitle(e.target.value)}
+                      placeholder="Tracker title (e.g., Yoga, Driving)"
+                      className="domus-input sm:col-span-2"
+                    />
+                    <select
+                      value={trkType}
+                      onChange={(e) =>
+                        setTrkType(
+                          e.target.value as "EXERCISE" | "DIET" | "LIFE_PLAN"
+                        )
+                      }
+                      className="domus-input"
+                    >
+                      <option value="EXERCISE">Exercise</option>
+                      <option value="DIET">Diet</option>
+                      <option value="LIFE_PLAN">Life Plan</option>
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={trkTarget}
+                        onChange={(e) => setTrkTarget(Number(e.target.value))}
+                        className="domus-input w-20"
+                      />
+                      <input
+                        value={trkUnit}
+                        onChange={(e) => setTrkUnit(e.target.value)}
+                        placeholder="unit"
+                        className="domus-input flex-1"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 sm:col-span-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewTracker(false)}
+                        className="domus-btn-secondary text-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="domus-btn-primary text-xs"
+                      >
+                        Save Tracker
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {trackers.length === 0 ? (
+                  <p className="rounded-xl bg-stone-50 p-4 text-xs text-stone-500">
+                    No personal trackers yet. Click “Add Tracker” to start!
+                  </p>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {trackers.map((trk) => {
+                      const pct = Math.min(
+                        100,
+                        Math.round((trk.currentValue / trk.targetValue) * 100)
+                      );
+                      return (
+                        <TiltCard
+                          key={trk.id}
+                          maxTilt={5}
+                          lift={4}
+                          className="flex flex-col justify-between p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                                {trk.cadence} · {trk.category}
+                              </span>
+                              <h4 className="text-sm font-bold text-stone-900">
+                                {trk.title}
+                              </h4>
+                              <p className="mt-1 text-xs font-semibold text-stone-600">
+                                {trk.currentValue} / {trk.targetValue}{" "}
+                                {trk.unit}
+                              </p>
+                            </div>
+                            <ProgressRing25D
+                              percent={pct}
+                              color={roomOwner?.color ?? "#3b6e52"}
+                              size={50}
+                              strokeWidth={5}
+                            />
+                          </div>
+
+                          {isOwnRoom && (
+                            <div className="mt-3 border-t border-stone-100 pt-2.5">
+                              {logId === trk.id ? (
+                                <form
+                                  onSubmit={(e) => handleLogProgress(e, trk.id)}
+                                  className="flex gap-1.5"
+                                >
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    min="0.1"
+                                    value={logVal}
+                                    onChange={(e) => setLogVal(e.target.value)}
+                                    className="domus-input w-16 py-1 text-xs"
+                                  />
+                                  <input
+                                    value={logNote}
+                                    onChange={(e) => setLogNote(e.target.value)}
+                                    placeholder="Note..."
+                                    className="domus-input flex-1 py-1 text-xs"
+                                  />
+                                  <button
+                                    type="submit"
+                                    className="domus-btn-primary px-2.5 py-1 text-xs"
+                                  >
+                                    Add
+                                  </button>
+                                </form>
+                              ) : (
+                                <motion.button
+                                  whileTap={{ scale: 0.96 }}
+                                  onClick={() => {
+                                    setLogId(trk.id);
+                                    setLogVal("1");
+                                  }}
+                                  className="domus-btn-secondary w-full py-1.5 text-xs"
+                                >
+                                  + Log {trk.unit}
+                                </motion.button>
+                              )}
+                            </div>
+                          )}
+                        </TiltCard>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          return null;
+        }}
+      />
     </div>
   );
 }

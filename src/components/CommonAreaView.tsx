@@ -16,6 +16,11 @@ import CommonSocialHub from "./CommonSocialHub";
 import FreeformDecorCanvas from "./FreeformDecorCanvas";
 import InteractiveBoard from "./InteractiveBoard";
 import ListsView from "./ListsView";
+import SpaceBuilder, {
+  AvailableBlockOption,
+  normalizeSpaceBlocks,
+  SpaceBlockItem,
+} from "./SpaceBuilder";
 import TiltCard from "./TiltCard";
 import {
   ActiveTab,
@@ -106,6 +111,29 @@ export default function CommonAreaView({
 
   const theme =
     ROOM_THEMES[roomConfig?.theme ?? "stone"] ?? ROOM_THEMES.stone;
+
+  const DEFAULT_COMMON_BLOCKS: SpaceBlockItem[] = [
+    { id: "blk_social", type: "social", span: 12 },
+    { id: "blk_board", type: "board", span: 12 },
+    { id: "blk_gear", type: "gear", span: 12 },
+    { id: "blk_lists", type: "lists", span: 12 },
+  ];
+
+  const COMMON_AVAILABLE_BLOCKS: AvailableBlockOption[] = [
+    { type: "board", label: "Common House Board", defaultSpan: 12 },
+    {
+      type: "social",
+      label: "Fridge Meals, Workouts & Votes",
+      defaultSpan: 12,
+    },
+    { type: "gear", label: "Shared House Gear", defaultSpan: 12 },
+    { type: "lists", label: "Shopping & Chore Checklists", defaultSpan: 12 },
+  ];
+
+  const blocks = normalizeSpaceBlocks(
+    roomConfig?.layout ?? [],
+    DEFAULT_COMMON_BLOCKS
+  );
 
   return (
     <div className="space-y-6">
@@ -221,112 +249,122 @@ export default function CommonAreaView({
         </FreeformDecorCanvas>
       )}
 
-      {/* Shared House Gear Strip (2.5D Tilt Cards) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wrench className="h-4 w-4 text-terracotta-500" />
-            <h3 className="text-sm font-bold text-stone-900">
-              Shared House Gear
-            </h3>
-            <span className="text-xs text-stone-400">
-              Attach gear to any board card or calendar block to prevent double-booking
-            </span>
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {resources.map((res, idx) => (
-            <motion.div
-              key={res.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.04 }}
-            >
-              <TiltCard maxTilt={6} lift={4} className="flex items-center gap-3.5 p-3.5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={res.iconAsset}
-                  alt={res.name}
-                  className="h-14 w-14 shrink-0 rounded-xl bg-[#faf9f5] object-cover shadow-sm"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        res.status === "AVAILABLE"
-                          ? "bg-sage-500"
-                          : "bg-terracotta-500"
-                      }`}
-                    />
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wide ${
-                        res.status === "AVAILABLE"
-                          ? "text-sage-600"
-                          : "text-terracotta-600"
-                      }`}
-                    >
-                      {res.status === "AVAILABLE" ? "Free Now" : "In Use"}
-                    </span>
-                  </div>
-                  <p className="truncate text-xs font-bold text-stone-900">
-                    {res.name}
-                  </p>
-                  <p className="truncate text-[11px] text-stone-500">
-                    {res.currentEventTitle
-                      ? res.currentEventTitle
-                      : res.nextBooking
-                        ? `Next: ${formatShortDate(res.nextBooking.startTime)}`
-                        : "Open to reserve"}
-                  </p>
+      {/* Modular Drag-and-Drop Common Space Builder (Arrange Boards, Meals, Votes, Gear, Lists & Custom Notes Anywhere!) */}
+      <SpaceBuilder
+        blocks={blocks}
+        availableBlocks={COMMON_AVAILABLE_BLOCKS}
+        onChangeBlocks={(next) => handleSaveRoomConfig({ layout: next })}
+        renderBlock={(block) => {
+          if (block.type === "gear") {
+            return (
+              <div className="domus-card space-y-3 p-5">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-terracotta-500" />
+                  <h3 className="text-sm font-bold text-stone-900">
+                    Shared House Gear
+                  </h3>
                 </div>
-              </TiltCard>
-            </motion.div>
-          ))}
-        </div>
-      </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {resources.map((res) => (
+                    <TiltCard
+                      key={res.id}
+                      maxTilt={6}
+                      lift={4}
+                      className="flex items-center gap-3 p-3"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={res.iconAsset}
+                        alt={res.name}
+                        className="h-12 w-12 shrink-0 rounded-xl bg-[#faf9f5] object-cover shadow-sm"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <span
+                          className={`text-[10px] font-bold uppercase ${
+                            res.status === "AVAILABLE"
+                              ? "text-sage-600"
+                              : "text-terracotta-600"
+                          }`}
+                        >
+                          {res.status === "AVAILABLE" ? "Free Now" : "In Use"}
+                        </span>
+                        <p className="truncate text-xs font-bold text-stone-900">
+                          {res.name}
+                        </p>
+                        <p className="truncate text-[10px] text-stone-500">
+                          {res.currentEventTitle
+                            ? res.currentEventTitle
+                            : res.nextBooking
+                              ? `Next: ${formatShortDate(res.nextBooking.startTime)}`
+                              : "Open to reserve"}
+                        </p>
+                      </div>
+                    </TiltCard>
+                  ))}
+                </div>
+              </div>
+            );
+          }
 
-      {/* Fridge Meal Notes, Group Workouts & House Votes */}
-      <CommonSocialHub currentMember={currentMember} members={members} />
+          if (block.type === "social") {
+            return (
+              <CommonSocialHub
+                currentMember={currentMember}
+                members={members}
+              />
+            );
+          }
 
-      {/* Main Interactive Drag-and-Drop Common House Board */}
-      {board && (
-        <div className="domus-card p-5">
-          <InteractiveBoard
-            board={board}
-            columns={columns}
-            cards={cards}
-            members={members}
-            resources={resources}
-            currentMember={currentMember}
-            onRefresh={loadCommon}
-          />
-        </div>
-      )}
+          if (block.type === "board" && board) {
+            return (
+              <div className="domus-card p-5">
+                <InteractiveBoard
+                  board={board}
+                  columns={columns}
+                  cards={cards}
+                  members={members}
+                  resources={resources}
+                  currentMember={currentMember}
+                  onRefresh={loadCommon}
+                />
+              </div>
+            );
+          }
 
-      {/* Expandable Common Lists (Shopping, Meal Prep, Chores) */}
-      <div className="domus-card p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-stone-900">
-              Shared Shopping, Meal Prep &amp; Chore Checklists
-            </h3>
-            <p className="text-xs text-stone-500">
-              Quick check-off lists for groceries, Sunday meal prep, and yard upkeep
-            </p>
-          </div>
-          <button
-            onClick={() => setShowLists((v) => !v)}
-            className="domus-btn-secondary whitespace-nowrap text-xs"
-          >
-            {showLists ? "Hide Checklists" : "Open Checklists"}
-          </button>
-        </div>
-        {showLists && (
-          <div className="mt-5 border-t border-stone-100 pt-5">
-            <ListsView currentMember={currentMember} members={members} />
-          </div>
-        )}
-      </div>
+          if (block.type === "lists") {
+            return (
+              <div className="domus-card p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-stone-900">
+                      Shared Shopping, Meal Prep &amp; Chore Checklists
+                    </h3>
+                    <p className="text-xs text-stone-500">
+                      Quick check-off lists for groceries &amp; home upkeep
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowLists((v) => !v)}
+                    className="domus-btn-secondary whitespace-nowrap text-xs"
+                  >
+                    {showLists ? "Hide Checklists" : "Open Checklists"}
+                  </button>
+                </div>
+                {showLists && (
+                  <div className="mt-5 border-t border-stone-100 pt-5">
+                    <ListsView
+                      currentMember={currentMember}
+                      members={members}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          return null;
+        }}
+      />
     </div>
   );
 }
