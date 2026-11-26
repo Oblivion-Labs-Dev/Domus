@@ -47,6 +47,6 @@ export async function POST(request: Request) {
     memberName: member.name,
     residenceName: hhRows[0]?.name ?? "Your Residence",
     houseKey: hhRows[0]?.houseKey ?? "DOMUS-HOME",
-    message: `Found ${member.name} in "${hhRows[0]?.name}". Ask your Head of Household if you need a fresh Room Key minted.`,
+    message: `Found ${member.name} in "${hhRows[0]?.name}" (House Key: ${hhRows[0]?.houseKey}). If you also forgot your Room Key, ask your Head of Household to mint a new one.`,
   });
 }

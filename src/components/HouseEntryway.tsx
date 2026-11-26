@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Compass, KeyRound } from "lucide-react";
+import { ArrowRight, Check, Compass, Copy, KeyRound } from "lucide-react";
 import type { MemberContext } from "@/lib/rbac";
 import MemberAvatar from "./MemberAvatar";
 import TiltCard from "./TiltCard";
@@ -22,6 +23,18 @@ export default function HouseEntryway({
   onEnter,
   onStartTour,
 }: HouseEntrywayProps) {
+  const [copiedKey, setCopiedKey] = useState(false);
+
+  async function handleCopyHouseKey() {
+    if (!household?.houseKey) return;
+    try {
+      await navigator.clipboard.writeText(household.houseKey);
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2000);
+    } catch {
+      // ignore
+    }
+  }
   const doorways: Array<{
     tab: ActiveTab;
     title: string;
@@ -79,9 +92,27 @@ export default function HouseEntryway({
                 size="md"
               />
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
-                  {household?.name ?? "The Domus Residence"}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
+                    {household?.name ?? "The Domus Residence"}
+                  </p>
+                  {household?.houseKey && (
+                    <button
+                      type="button"
+                      onClick={handleCopyHouseKey}
+                      title="Copy your House Key"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#efe7dc] px-2.5 py-0.5 font-mono text-[11px] font-bold text-[#1e1916] transition hover:bg-[#e5d9ca]"
+                    >
+                      <KeyRound className="h-3 w-3 text-terracotta-600" />
+                      {household.houseKey}
+                      {copiedKey ? (
+                        <Check className="h-3 w-3 text-sage-600" />
+                      ) : (
+                        <Copy className="h-3 w-3 text-[#6b5d53]" />
+                      )}
+                    </button>
+                  )}
+                </div>
                 <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
                   Welcome home, {currentMember.name}
                 </h1>
@@ -117,22 +148,13 @@ export default function HouseEntryway({
             </div>
           </div>
 
-          <div className="md:col-span-5">
-            <motion.div
-              whileHover={{ y: -4, rotate: -1 }}
-              className="overflow-hidden rounded-3xl border-2 border-white bg-[#faf9f5] shadow-md"
-              style={{
-                boxShadow:
-                  "0 6px 0 0 rgba(202,187,165,0.85), 0 20px 34px -14px rgba(25,21,18,0.22)",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/assets/house-hero.png"
-                alt="Domus Home"
-                className="h-52 w-full object-cover"
-              />
-            </motion.div>
+          <div className="pointer-events-none flex items-center justify-center md:col-span-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/house-hero-cutout.png"
+              alt="Domus Home"
+              className="max-h-56 w-auto select-none object-contain"
+            />
           </div>
         </div>
       </motion.div>

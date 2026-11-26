@@ -6,16 +6,24 @@ import {
   boardColumns,
   boards,
   households,
-  houseResources,
   members,
   roomConfigs,
 } from "@/db/schema";
 import { getCurrentMember, hashPassword, setSessionCookie } from "@/lib/auth";
 import { getAvatarPreset } from "@/lib/avatars";
 
-function mintHouseKey(): string {
-  const code = Math.floor(1000 + Math.random() * 9000);
-  return `DOMUS-${code}`;
+async function mintUniqueHouseKey(): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const code = Math.floor(1000 + Math.random() * 9000);
+    const candidate = `DOMUS-${code}`;
+    const existing = await db
+      .select({ id: households.id })
+      .from(households)
+      .where(eq(households.houseKey, candidate))
+      .limit(1);
+    if (existing.length === 0) return candidate;
+  }
+  return `DOMUS-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
 }
 
 export async function POST(request: Request) {
@@ -35,11 +43,11 @@ export async function POST(request: Request) {
     const roomKey = String(body.roomKey ?? "").trim();
     const avatarId = String(body.avatarId ?? "crown");
 
-    if (!residenceName || !name || !email || roomKey.length < 4) {
+    if (!residenceName || !name || !email || roomKey.length < 6) {
       return NextResponse.json(
         {
           error:
-            "Please provide a residence name, your name, email, and a Room Key (4+ chars).",
+            "Please provide a residence name, your name, email, and a Room Key (6+ chars).",
         },
         { status: 400 }
       );
@@ -58,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     const householdId = `hh_${crypto.randomUUID().slice(0, 8)}`;
-    const houseKey = mintHouseKey();
+    const houseKey = await mintUniqueHouseKey();
     const memberId = `mem_${crypto.randomUUID().slice(0, 8)}`;
     const preset = getAvatarPreset(avatarId);
     const initials = name
@@ -130,11 +138,6 @@ export async function POST(request: Request) {
       { id: `col_${crypto.randomUUID().slice(0, 6)}`, boardId: personalBoardId, householdId, title: "Done", color: "#3b6e52", position: 1 },
     ]);
 
-    await db.insert(houseResources).values([
-      { id: `res_${crypto.randomUUID().slice(0, 6)}`, householdId, name: "Family Car", category: "VEHICLE", iconAsset: "/assets/decor-car.png", notes: "Shared vehicle", createdAt: now },
-      { id: `res_${crypto.randomUUID().slice(0, 6)}`, householdId, name: "Lawn Mower", category: "YARD", iconAsset: "/assets/decor-mower.png", notes: "Yard care", createdAt: now },
-    ]);
-
     await db.insert(roomConfigs).values([
       {
         id: `rc_${crypto.randomUUID().slice(0, 8)}`,
@@ -163,7 +166,15 @@ export async function POST(request: Request) {
     ]);
 
     await setSessionCookie(memberId);
-    return NextResponse.json({ householdId, houseKey, memberId }, { status: 201 });
+    return NextResponse.json(
+      {
+        householdId,
+        residenceName: residenceName.slice(0, 64),
+        houseKey,
+        memberId,
+      },
+      { status: 201 }
+    );
   }
 
   // JOIN AN EXISTING HOUSE WITH HOUSE KEY

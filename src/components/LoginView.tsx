@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
+  Check,
+  Copy,
   DoorOpen,
+  Eye,
+  EyeOff,
   Home,
   KeyRound,
   Lock,
@@ -38,7 +42,21 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
   // Recovery
   const [recoverEmail, setRecoverEmail] = useState("");
-  const [recoverResult, setRecoverResult] = useState<string | null>(null);
+  const [recoverResult, setRecoverResult] = useState<{
+    message: string;
+    houseKey?: string;
+    residenceName?: string;
+  } | null>(null);
+
+  // Welcome Keycard shown right after creating a house (so user ALWAYS receives & saves their House Key + Room Key!)
+  const [createdKeycard, setCreatedKeycard] = useState<{
+    residenceName: string;
+    houseKey: string;
+    roomKey: string;
+    email: string;
+  } | null>(null);
+  const [showCreatedRoomKey, setShowCreatedRoomKey] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
@@ -48,17 +66,32 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
     setMode(initialMode);
     setError(null);
     setRecoverResult(null);
+    setCreatedKeycard(null);
+    setShowCreatedRoomKey(false);
+    setCopiedField(null);
     setModalOpen(true);
   }
 
+  async function copyText(field: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => {
+        setCopiedField((prev) => (prev === field ? null : prev));
+      }, 2000);
+    } catch {
+      // Fallback ignored if clipboard blocked
+    }
+  }
+
   useEffect(() => {
-    if (!modalOpen) return;
+    if (!modalOpen || createdKeycard) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setModalOpen(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [modalOpen]);
+  }, [modalOpen, createdKeycard]);
 
   async function handleEnterHouse(e: React.FormEvent) {
     e.preventDefault();
@@ -106,7 +139,13 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
         setError(data.error ?? "Could not create your house.");
         return;
       }
-      await onAuthenticated();
+      // Show the minted House Key + Room Key Welcome Keycard before stepping inside!
+      setCreatedKeycard({
+        residenceName: data.residenceName ?? residenceName,
+        houseKey: data.houseKey,
+        roomKey: newRoomKey,
+        email: recoveryEmail,
+      });
     } finally {
       setLoading(false);
     }
@@ -128,7 +167,11 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
         setError(data.error ?? "Recovery lookup failed.");
         return;
       }
-      setRecoverResult(data.message);
+      setRecoverResult({
+        message: data.message,
+        houseKey: data.houseKey,
+        residenceName: data.residenceName,
+      });
     } finally {
       setLoading(false);
     }
@@ -364,7 +407,9 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            onClick={() => setModalOpen(false)}
+            onClick={() => {
+              if (!createdKeycard) setModalOpen(false);
+            }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
           >
             <motion.div
@@ -376,15 +421,162 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
               className="domus-card relative w-full max-w-md space-y-6 p-6 sm:p-8"
             >
               {/* Modal Close Button */}
-              <button
-                type="button"
-                aria-label="Close modal"
-                onClick={() => setModalOpen(false)}
-                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] transition hover:bg-[#e5d9ca] hover:text-[#1e1916]"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {!createdKeycard && (
+                <button
+                  type="button"
+                  aria-label="Close modal"
+                  onClick={() => {
+              if (!createdKeycard) setModalOpen(false);
+            }}
+                  className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] transition hover:bg-[#e5d9ca] hover:text-[#1e1916]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
 
+              {/* WELCOME KEYCARD RIGHT AFTER CREATING A HOUSE */}
+              {createdKeycard ? (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sage-100 text-sage-700">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-sage-700">
+                        House Created · Save Your Keys
+                      </p>
+                      <h3 className="text-base font-bold text-[#1e1916]">
+                        {createdKeycard.residenceName}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <p className="text-xs leading-relaxed text-[#574c44]">
+                    Save these two keys so you can unlock your house next time.
+                    Share your <strong>House Key</strong> with family members
+                    when you invite them.
+                  </p>
+
+                  <div className="space-y-3 rounded-2xl bg-[#f3ece2] p-4">
+                    {/* House Key */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#6b5d53]">
+                          House Key
+                        </p>
+                        <p className="mt-0.5 font-mono text-base font-extrabold tracking-wide text-[#1e1916]">
+                          {createdKeycard.houseKey}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyText("houseKey", createdKeycard.houseKey)
+                        }
+                        className="domus-btn-secondary px-3 py-1.5 text-xs"
+                      >
+                        {copiedField === "houseKey" ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-sage-600" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="border-t border-[#e2d7c8]" />
+
+                    {/* Personal Room Key */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#6b5d53]">
+                          Your Personal Room Key
+                        </p>
+                        <p className="mt-0.5 font-mono text-sm font-bold text-[#1e1916]">
+                          {showCreatedRoomKey
+                            ? createdKeycard.roomKey
+                            : "•".repeat(createdKeycard.roomKey.length)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowCreatedRoomKey((v) => !v)}
+                          className="domus-btn-secondary px-2.5 py-1.5 text-xs"
+                          title={showCreatedRoomKey ? "Hide key" : "Show key"}
+                        >
+                          {showCreatedRoomKey ? (
+                            <EyeOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            copyText("roomKey", createdKeycard.roomKey)
+                          }
+                          className="domus-btn-secondary px-3 py-1.5 text-xs"
+                        >
+                          {copiedField === "roomKey" ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 text-sage-600" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5" />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyText(
+                          "all",
+                          `Domus Residence: ${createdKeycard.residenceName}\nHouse Key: ${createdKeycard.houseKey}\nMy Room Key: ${createdKeycard.roomKey}\nRecovery Email: ${createdKeycard.email}`
+                        )
+                      }
+                      className="domus-btn-secondary flex-1 py-2.5 text-xs"
+                    >
+                      {copiedField === "all" ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-sage-600" />
+                          Keycard Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy Full Keycard
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await onAuthenticated();
+                      }}
+                      className="domus-btn-accent flex-1 py-2.5 text-xs"
+                    >
+                      Step Inside House
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
               {/* Strictly 2 Claymorphic Tabs */}
               <div
                 className="mr-10 grid grid-cols-2 gap-1.5 rounded-2xl bg-[#efe7dc] p-1.5 text-xs font-bold"
@@ -639,9 +831,23 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     className="domus-input"
                   />
                   {recoverResult && (
-                    <p className="rounded-2xl border border-sage-200 bg-sage-50 px-3.5 py-2.5 text-xs font-semibold text-sage-800">
-                      {recoverResult}
-                    </p>
+                    <div className="space-y-2.5 rounded-2xl border border-sage-200 bg-sage-50 px-3.5 py-3 text-xs font-medium text-sage-900">
+                      <p>{recoverResult.message}</p>
+                      {recoverResult.houseKey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHouseIdentifier(recoverResult.houseKey ?? "");
+                            setMode("ENTER");
+                            setRecoverResult(null);
+                          }}
+                          className="domus-btn-secondary w-full py-2 text-xs"
+                        >
+                          Use {recoverResult.houseKey} to Enter House
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   )}
                   {error && (
                     <p className="rounded-2xl bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
@@ -671,6 +877,8 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                 <ShieldCheck className="h-3.5 w-3.5 text-sage-600" />
                 <span>Encrypted Room Keys · Signed HTTP-only sessions</span>
               </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

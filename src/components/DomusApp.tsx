@@ -4,9 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Calendar,
+  Check,
   Compass,
+  Copy,
   DoorOpen,
   Home,
+  KeyRound,
   LayoutGrid,
   LogOut,
   Palette,
@@ -54,6 +57,19 @@ export default function DomusApp() {
   const [tourOpen, setTourOpen] = useState(false);
   const [palette, setPalette] = useState<GlobalPaletteId>("botanical");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [copiedHouseKey, setCopiedHouseKey] = useState(false);
+
+  async function handleCopyHeaderKey(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!session.household?.houseKey) return;
+    try {
+      await navigator.clipboard.writeText(session.household.houseKey);
+      setCopiedHouseKey(true);
+      setTimeout(() => setCopiedHouseKey(false), 2000);
+    } catch {
+      // ignore
+    }
+  }
 
   useEffect(() => {
     const saved =
@@ -232,6 +248,28 @@ export default function DomusApp() {
               <span className="hidden whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 xl:inline">
                 {session.household?.name ?? "Household"}
               </span>
+              {session.household?.houseKey && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleCopyHeaderKey}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      handleCopyHeaderKey(e as unknown as React.MouseEvent);
+                    }
+                  }}
+                  title="Copy House Key"
+                  className="hidden cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-[10px] font-bold text-white/90 transition hover:bg-white/20 xl:inline-flex"
+                >
+                  <KeyRound className="h-3 w-3 text-amber-300" />
+                  {session.household.houseKey}
+                  {copiedHouseKey ? (
+                    <Check className="h-3 w-3 text-emerald-300" />
+                  ) : (
+                    <Copy className="h-3 w-3 opacity-75" />
+                  )}
+                </span>
+              )}
             </div>
           </button>
 

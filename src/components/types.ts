@@ -4,6 +4,7 @@ import type { NoteColorId, PlacedDecor, RoomThemeId } from "@/lib/decor";
 export interface HouseholdDTO {
   id: string;
   name: string;
+  houseKey?: string;
   timezone: string;
   quietHoursStart: string;
   quietHoursEnd: string;
