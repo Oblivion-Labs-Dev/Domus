@@ -30,6 +30,8 @@ interface FamilyCalendarPanelProps {
   onRefresh: () => Promise<void>;
   personalOnly?: boolean;
   ownerName?: string;
+  viewingMemberId?: string;
+  readOnly?: boolean;
   className?: string;
 }
 
@@ -97,8 +99,11 @@ export default function FamilyCalendarPanel({
   onRefresh,
   personalOnly = false,
   ownerName,
+  viewingMemberId,
+  readOnly = false,
   className = "lg:sticky lg:top-20 lg:col-span-5",
 }: FamilyCalendarPanelProps) {
+  const targetMemberId = viewingMemberId ?? currentMember.id;
   const [view, setView] = useState<"MONTH" | "WEEK" | "DAY">("MONTH");
   const [scope, setScope] = useState<"ALL" | "MINE">(
     personalOnly ? "MINE" : "ALL"
@@ -278,8 +283,8 @@ export default function FamilyCalendarPanel({
         scope === "MINE" &&
         ev.category !== "BIRTHDAY" &&
         ev.category !== "HOLIDAY" &&
-        ev.ownerId !== currentMember.id &&
-        !involved.includes(currentMember.id)
+        ev.ownerId !== targetMemberId &&
+        !involved.includes(targetMemberId)
       ) {
         continue;
       }
@@ -348,7 +353,7 @@ export default function FamilyCalendarPanel({
             scope === "MINE" &&
             !isBirthday &&
             item.assigneeId &&
-            item.assigneeId !== currentMember.id
+            item.assigneeId !== targetMemberId
           ) {
             continue;
           }
@@ -385,7 +390,7 @@ export default function FamilyCalendarPanel({
     }
 
     return map;
-  }, [displayYear, events, lists, scope, currentMember.id]);
+  }, [displayYear, events, lists, scope, targetMemberId]);
 
   // Month cells
   const monthDays = useMemo(() => {
@@ -472,7 +477,9 @@ export default function FamilyCalendarPanel({
                 {ownerName ? `${ownerName}'s Calendar` : "My Personal Calendar"}
               </h2>
               <p className="text-[10px] text-[#6b5d53]">
-                Your private schedule &amp; house events involving you
+                {readOnly
+                  ? `${ownerName ?? "Member"}'s schedule (view only)`
+                  : "Your private schedule & house events involving you"}
               </p>
             </div>
           ) : (
@@ -520,14 +527,16 @@ export default function FamilyCalendarPanel({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => openAddModal(view === "DAY" ? activeDayKey : todayKey)}
-          className="domus-btn-accent px-3.5 py-1.5 text-xs"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Schedule
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => openAddModal(view === "DAY" ? activeDayKey : todayKey)}
+            className="domus-btn-accent px-3.5 py-1.5 text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Schedule
+          </button>
+        )}
       </div>
 
       {/* Row 2: Date Navigation + Today + View Switcher (Month | Week | Day) */}
@@ -748,16 +757,18 @@ export default function FamilyCalendarPanel({
                       })}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openAddModal(key);
-                    }}
-                    className="rounded-lg bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[#5c5047] hover:bg-white hover:text-[#1e1916]"
-                  >
-                    + Add
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAddModal(key);
+                      }}
+                      className="rounded-lg bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[#5c5047] hover:bg-white hover:text-[#1e1916]"
+                    >
+                      + Add
+                    </button>
+                  )}
                 </div>
 
                 {items.length === 0 ? (
@@ -847,17 +858,25 @@ export default function FamilyCalendarPanel({
               return (
                 <div
                   key={hour}
-                  onClick={() => openAddModal(activeDayKey, hour)}
-                  className="group flex min-h-[36px] cursor-pointer items-start gap-2 rounded-xl border border-transparent px-1.5 py-1 transition hover:border-[#dfd4c6] hover:bg-[#f3ede4]/60"
+                  onClick={() => {
+                    if (!readOnly) openAddModal(activeDayKey, hour);
+                  }}
+                  className={`group flex min-h-[36px] items-start gap-2 rounded-xl border border-transparent px-1.5 py-1 transition ${
+                    readOnly
+                      ? ""
+                      : "cursor-pointer hover:border-[#dfd4c6] hover:bg-[#f3ede4]/60"
+                  }`}
                 >
                   <span className="w-12 shrink-0 pt-0.5 text-right text-[10px] font-bold text-[#7c6e63]">
                     {formatHourShort(hour)}
                   </span>
                   <div className="min-w-0 flex-1 border-t border-[#e8dfd3] pt-1">
                     {slotEvents.length === 0 ? (
-                      <span className="text-[10px] font-semibold text-terracotta-500 opacity-0 transition group-hover:opacity-100">
-                        + Schedule at {formatHourShort(hour)}
-                      </span>
+                      !readOnly ? (
+                        <span className="text-[10px] font-semibold text-terracotta-500 opacity-0 transition group-hover:opacity-100">
+                          + Schedule at {formatHourShort(hour)}
+                        </span>
+                      ) : null
                     ) : (
                       <div className="space-y-1">
                         {slotEvents.map((ev) => (
@@ -1003,7 +1022,7 @@ export default function FamilyCalendarPanel({
                           </div>
                         </div>
 
-                        {entry.eventId && (
+                        {!readOnly && entry.eventId && (
                           <button
                             type="button"
                             onClick={() => handleDeleteEvent(entry.eventId!)}
@@ -1068,18 +1087,20 @@ export default function FamilyCalendarPanel({
                 >
                   Open Hourly View
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const dk = selectedDayKey;
-                    setSelectedDayKey(null);
-                    openAddModal(dk);
-                  }}
-                  className="domus-btn-accent flex-1 py-2.5 text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Event / Task
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const dk = selectedDayKey;
+                      setSelectedDayKey(null);
+                      openAddModal(dk);
+                    }}
+                    className="domus-btn-accent flex-1 py-2.5 text-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Event / Task
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>

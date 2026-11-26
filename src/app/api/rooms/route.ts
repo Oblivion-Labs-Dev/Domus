@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db, ensureTables } from "@/db";
-import { boardCards, boards, roomConfigs, roomKnocks, trackers } from "@/db/schema";
+import { boardCards, boards, members, roomConfigs, roomKnocks, trackers } from "@/db/schema";
 import { getCurrentMember } from "@/lib/auth";
 import { canEnterRoom } from "@/lib/rbac";
 
@@ -52,14 +52,29 @@ export async function GET(request: Request) {
   if (!config) {
     const now = new Date().toISOString();
     const id = `rc_${crypto.randomUUID().slice(0, 8)}`;
+    let defaultTitle = "The Common Living Room";
+    if (ownerKey !== "COMMON") {
+      const ownerRows = await db
+        .select({ name: members.name })
+        .from(members)
+        .where(
+          and(
+            eq(members.id, ownerKey),
+            eq(members.householdId, viewer.householdId)
+          )
+        )
+        .limit(1);
+      defaultTitle = ownerRows[0]?.name
+        ? `${ownerRows[0].name}'s Room`
+        : "Private Room";
+    }
     const defaults = {
       id,
       householdId: viewer.householdId,
       ownerKey,
-      roomTitle:
-        ownerKey === "COMMON" ? "The Common Living Room" : "My Personal Room",
+      roomTitle: defaultTitle,
       theme: "stone",
-      bannerQuote: "Arrange your boards, notes & decor however you like.",
+      bannerQuote: "",
       isPublic: false,
       layoutJson: JSON.stringify(["board", "trackers"]),
       decorItemsJson: JSON.stringify([

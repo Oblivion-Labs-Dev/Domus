@@ -192,6 +192,22 @@ export const roomKnocks = sqliteTable("room_knocks", {
   respondedAt: text("responded_at"),
 });
 
+export const roomGuestbook = sqliteTable("room_guestbook", {
+  id: text("id").primaryKey(),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  roomOwnerId: text("room_owner_id")
+    .notNull()
+    .references(() => members.id, { onDelete: "cascade" }),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => members.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull().default("COMMENT"), // COMMENT | LIKE
+  message: text("message").notNull().default(""),
+  createdAt: text("created_at").notNull(),
+});
+
 export const trackers = sqliteTable("trackers", {
   id: text("id").primaryKey(),
   householdId: text("household_id")

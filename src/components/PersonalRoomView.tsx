@@ -11,10 +11,13 @@ import {
   Check,
   DoorClosed,
   DoorOpen,
+  Heart,
   ListTodo,
   Lock,
+  MessageSquareHeart,
   Pin,
   Plus,
+  Send,
   StickyNote,
   Target,
   Trash2,
@@ -38,6 +41,13 @@ import type {
   RoomKnockDTO,
   TrackerDTO,
 } from "./types";
+
+interface GuestbookComment {
+  id: string;
+  authorId: string;
+  message: string;
+  createdAt: string;
+}
 
 interface EarnedBadge {
   id: string;
@@ -107,6 +117,13 @@ export default function PersonalRoomView({
   );
   const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
   const [selectedBadge, setSelectedBadge] = useState<EarnedBadge | null>(null);
+
+  // Visitor Guestbook (Likes & Comments — so visitors can react & leave notes without modifying the room!)
+  const [likesCount, setLikesCount] = useState(0);
+  const [likedByMe, setLikedByMe] = useState(false);
+  const [guestComments, setGuestComments] = useState<GuestbookComment[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentSending, setCommentSending] = useState(false);
 
   const badgeStorageKey = `domus_earned_badges_v2_${roomOwnerId}`;
   const removedBadgeKey = `domus_removed_badges_v2_${roomOwnerId}`;
@@ -208,7 +225,7 @@ export default function PersonalRoomView({
   const loadRoom = useCallback(async () => {
     setLockedMessage(null);
     try {
-      const [roomRes, boardRes, knockRes, eventsRes, listsRes] =
+      const [roomRes, boardRes, knockRes, eventsRes, listsRes, gbRes] =
         await Promise.all([
           fetch(`/api/rooms?ownerKey=${encodeURIComponent(roomOwnerId)}`, {
             cache: "no-store",
@@ -220,6 +237,10 @@ export default function PersonalRoomView({
           fetch("/api/rooms/knocks", { cache: "no-store" }),
           fetch("/api/calendar/events", { cache: "no-store" }),
           fetch("/api/lists", { cache: "no-store" }),
+          fetch(
+            `/api/rooms/guestbook?roomOwnerId=${encodeURIComponent(roomOwnerId)}`,
+            { cache: "no-store" }
+          ),
         ]);
 
       if (roomRes.status === 403) {
@@ -253,6 +274,12 @@ export default function PersonalRoomView({
       if (listsRes.ok) {
         const d = await listsRes.json();
         setLists(d.lists ?? []);
+      }
+      if (gbRes.ok) {
+        const d = await gbRes.json();
+        setLikesCount(Number(d.likesCount ?? 0));
+        setLikedByMe(Boolean(d.likedByMe));
+        setGuestComments(d.comments ?? []);
       }
     } finally {
       setLoading(false);
@@ -455,6 +482,50 @@ export default function PersonalRoomView({
     if (!res.ok) await loadRoom();
   }
 
+  async function handleToggleLikeRoom() {
+    const nextLiked = !likedByMe;
+    setLikedByMe(nextLiked);
+    setLikesCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
+    const res = await fetch("/api/rooms/guestbook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomOwnerId, action: "TOGGLE_LIKE" }),
+    });
+    if (!res.ok) await loadRoom();
+  }
+
+  async function handlePostGuestComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentDraft.trim()) return;
+    setCommentSending(true);
+    try {
+      const res = await fetch("/api/rooms/guestbook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomOwnerId,
+          action: "COMMENT",
+          message: commentDraft.trim(),
+        }),
+      });
+      if (res.ok) {
+        setCommentDraft("");
+        await loadRoom();
+      }
+    } finally {
+      setCommentSending(false);
+    }
+  }
+
+  async function handleDeleteGuestComment(commentId: string) {
+    setGuestComments((prev) => prev.filter((c) => c.id !== commentId));
+    const res = await fetch(
+      `/api/rooms/guestbook?id=${encodeURIComponent(commentId)}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) await loadRoom();
+  }
+
   async function handleAddTracker(e: React.FormEvent) {
     e.preventDefault();
     if (!trkTitle.trim()) return;
@@ -630,13 +701,18 @@ export default function PersonalRoomView({
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-extrabold tracking-tight text-[#1e1916]">
-                  {config?.roomTitle ?? `${roomOwner?.name ?? "My"}'s Room`}
+                  {isOwnRoom
+                    ? config?.roomTitle &&
+                      config.roomTitle !== "My Personal Room"
+                      ? config.roomTitle
+                      : `${roomOwner?.name ?? currentMember.name}'s Room`
+                    : `${roomOwner?.name ?? "Member"}'s Room`}
                 </h1>
                 {!isOwnRoom && (
                   <span className="rounded-full bg-sage-100 px-2.5 py-0.5 text-[10px] font-bold text-sage-800">
-                    Visiting
+                    Visiting · View Only
                   </span>
                 )}
               </div>
@@ -645,22 +721,39 @@ export default function PersonalRoomView({
                   ? isDoorOpen
                     ? "Your door is open — family members can step in anytime."
                     : "Your door is locked — family members must knock before entering."
-                  : `You are visiting ${roomOwner?.name}'s room.`}
+                  : `Visiting ${roomOwner?.name ?? "this"}'s room — leave a like or comment in the guestbook below.`}
               </p>
             </div>
           </div>
 
-          {/* Far Right: Unmistakable 2-State Door Lock Switch */}
+          {/* Far Right: Like Button (for visitors) + Unmistakable 2-State Door Lock Switch (for owner) */}
           <div className="flex items-center gap-2.5">
             {!isOwnRoom ? (
-              <button
-                type="button"
-                onClick={onReturnToMyRoom}
-                className="domus-btn-secondary py-2 text-xs"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Back to My Room
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleToggleLikeRoom}
+                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-xs font-extrabold transition ${
+                    likedByMe
+                      ? "border-rose-300 bg-rose-100 text-rose-800 shadow-sm"
+                      : "border-white/80 bg-[#f3ede4] text-[#4e433b] hover:bg-white"
+                  }`}
+                >
+                  <Heart
+                    className={`h-3.5 w-3.5 ${likedByMe ? "fill-rose-500 text-rose-500" : ""}`}
+                  />
+                  {likedByMe ? "Liked" : "Like Room"}
+                  {likesCount > 0 && <span>· {likesCount}</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={onReturnToMyRoom}
+                  className="domus-btn-secondary py-2 text-xs"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Back to My Room
+                </button>
+              </>
             ) : (
               <div
                 role="group"
@@ -813,20 +906,27 @@ export default function PersonalRoomView({
       <div className="grid items-start gap-5 lg:grid-cols-12">
         {/* LEFT 7 COLS */}
         <div className="space-y-4 lg:col-span-7">
-          {/* 1. PERSONAL TASKS + PRIVATE DESK NOTEPAD (Side-by-side on sm+) */}
+          {/* 1. PERSONAL TASKS + PRIVATE DESK NOTEPAD (or Visitor Guestbook side-by-side when visiting!) */}
           <div className="grid gap-4 sm:grid-cols-12">
-            {/* Personal Tasks (7 cols) */}
-            <section className="domus-card flex flex-col justify-between p-4 sm:col-span-7 sm:p-5">
+            {/* Personal Tasks */}
+            <section
+              className={`domus-card flex flex-col justify-between p-4 sm:p-5 ${
+                isOwnRoom ? "sm:col-span-7" : "sm:col-span-12"
+              }`}
+            >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="flex items-center gap-2 text-base font-extrabold text-[#1e1916]">
                       <ListTodo className="h-4 w-4 text-terracotta-500" />
-                      Personal Tasks
+                      {isOwnRoom
+                        ? "Personal Tasks"
+                        : `${roomOwner?.name ?? "Member"}'s Tasks`}
                     </h2>
                     <p className="text-[11px] text-[#6b5d53]">
-                      Private to your room — click the calendar icon to time-block
-                      any task.
+                      {isOwnRoom
+                        ? "Private to your room — click the calendar icon to time-block any task."
+                        : "Read-only view while visiting."}
                     </p>
                   </div>
                 </div>
@@ -934,7 +1034,8 @@ export default function PersonalRoomView({
               )}
             </section>
 
-            {/* Private Desk Notepad — Create & Pin Multiple Notes to Your Board */}
+            {/* Private Desk Notepad — Owner Only (Visitors cannot edit or pin to someone else's room!) */}
+            {isOwnRoom && (
             <form
               onSubmit={handlePinNote}
               className="domus-card flex flex-col justify-between p-4 sm:col-span-5 sm:p-5"
@@ -994,6 +1095,7 @@ export default function PersonalRoomView({
                 </button>
               )}
             </form>
+            )}
           </div>
 
           {/* 2. PERSONAL GOALS & HABIT TRACKERS */}
@@ -1190,7 +1292,7 @@ export default function PersonalRoomView({
           </section>
         </div>
 
-        {/* RIGHT 5 COLS: PERSONAL MULTI-VIEW CALENDAR (Month | Week | Day) */}
+        {/* RIGHT 5 COLS: PERSONAL MULTI-VIEW CALENDAR (Read-Only when visiting someone else's room!) */}
         <FamilyCalendarPanel
           currentMember={currentMember}
           members={members}
@@ -1199,8 +1301,116 @@ export default function PersonalRoomView({
           onRefresh={loadRoom}
           personalOnly
           ownerName={isOwnRoom ? undefined : roomOwner?.name}
+          viewingMemberId={roomOwnerId}
+          readOnly={!isOwnRoom}
         />
       </div>
+
+      {/* VISITOR GUESTBOOK — Visitors can Like the room & leave friendly comments (without editing the room!) */}
+      <section className="domus-card p-5">
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-extrabold text-[#1e1916]">
+              <MessageSquareHeart className="h-4 w-4 text-rose-500" />
+              Visitor Guestbook
+            </h2>
+            <p className="text-[11px] text-[#6b5d53]">
+              {isOwnRoom
+                ? "Likes and notes left by family members who visited your room."
+                : `Leave a like or friendly note for ${roomOwner?.name ?? "the room owner"}!`}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleToggleLikeRoom}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-extrabold transition ${
+              likedByMe
+                ? "border-rose-300 bg-rose-100 text-rose-800"
+                : "border-transparent bg-[#f3ede4] text-[#5c5047] hover:bg-[#eae0d3]"
+            }`}
+          >
+            <Heart
+              className={`h-3.5 w-3.5 ${likedByMe ? "fill-rose-500 text-rose-500" : ""}`}
+            />
+            {likesCount} {likesCount === 1 ? "Like" : "Likes"}
+          </button>
+        </div>
+
+        <form onSubmit={handlePostGuestComment} className="mb-3.5 flex gap-2">
+          <input
+            value={commentDraft}
+            onChange={(e) => setCommentDraft(e.target.value)}
+            placeholder={
+              isOwnRoom
+                ? "Reply to your visitors or leave a welcome note..."
+                : `Write a friendly comment for ${roomOwner?.name ?? "this room"}...`
+            }
+            className="domus-input py-2 text-xs"
+          />
+          <button
+            type="submit"
+            disabled={commentSending || !commentDraft.trim()}
+            className="domus-btn-accent shrink-0 px-4 py-2 text-xs disabled:opacity-45"
+          >
+            <Send className="h-3.5 w-3.5" />
+            Post
+          </button>
+        </form>
+
+        {guestComments.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-[#dfd4c6] px-4 py-5 text-center text-xs text-[#8a7c71]">
+            No guestbook notes yet — be the first to leave a comment or a heart!
+          </p>
+        ) : (
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {guestComments.map((c) => {
+              const author = memberById.get(c.authorId);
+              const canDelete =
+                c.authorId === currentMember.id || isOwnRoom;
+              return (
+                <div
+                  key={c.id}
+                  className="group relative flex items-start gap-2.5 rounded-2xl bg-[#f3ede4] p-3"
+                >
+                  <MemberAvatar
+                    initials={author?.avatarInitials ?? "?"}
+                    color={author?.color ?? "#d45a33"}
+                    avatarId={author?.avatarId}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-xs font-extrabold text-[#1e1916]">
+                        {author?.name ?? "Family Member"}
+                      </p>
+                      <span className="text-[10px] text-[#7c6e63]">
+                        {new Date(c.createdAt).toLocaleDateString([], {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[#4e433b]">
+                      {c.message}
+                    </p>
+                  </div>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteGuestComment(c.id)}
+                      title="Delete comment"
+                      className="rounded-md p-1 text-[#8a7c71] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* PERSONAL PINBOARD — Sticky Notes pinned from Desk Notepad */}
       <section className="domus-card p-5">

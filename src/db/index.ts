@@ -257,6 +257,16 @@ export async function ensureTables(): Promise<void> {
       created_by_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS room_guestbook (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      room_owner_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      author_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'COMMENT',
+      message TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Safe migrations for existing local SQLite databases
