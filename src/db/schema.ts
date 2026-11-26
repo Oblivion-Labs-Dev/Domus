@@ -25,17 +25,32 @@ export const members = sqliteTable("members", {
   createdAt: text("created_at").notNull(),
 });
 
+export const houseResources = sqliteTable("house_resources", {
+  id: text("id").primaryKey(),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  category: text("category").notNull().default("GEAR"), // VEHICLE | YARD | WELLNESS | KITCHEN
+  iconAsset: text("icon_asset").notNull().default("/assets/decor-car.png"),
+  notes: text("notes").default(""),
+  createdAt: text("created_at").notNull(),
+});
+
 export const calendarEvents = sqliteTable("calendar_events", {
   id: text("id").primaryKey(),
   householdId: text("household_id")
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  category: text("category").notNull().default("FAMILY"), // FAMILY | EXERCISE | DIET | DRIVING | YOGA | SHOPPING | CHORE | PERSONAL | BOOKING
+  category: text("category").notNull().default("FAMILY"),
   ownerId: text("owner_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
   participantIdsJson: text("participant_ids_json").notNull().default("[]"),
+  resourceId: text("resource_id").references(() => houseResources.id, {
+    onDelete: "set null",
+  }),
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
   visibility: text("visibility").notNull().default("FAMILY"), // FAMILY | ADULTS_ONLY | PRIVATE
@@ -56,6 +71,9 @@ export const timeBookings = sqliteTable("time_bookings", {
   targetMemberId: text("target_member_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
+  resourceId: text("resource_id").references(() => houseResources.id, {
+    onDelete: "set null",
+  }),
   title: text("title").notNull(),
   category: text("category").notNull().default("BOOKING"),
   notes: text("notes").default(""),
@@ -69,6 +87,105 @@ export const timeBookings = sqliteTable("time_bookings", {
     onDelete: "set null",
   }),
   createdAt: text("created_at").notNull(),
+});
+
+export const boards = sqliteTable("boards", {
+  id: text("id").primaryKey(),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  scope: text("scope").notNull(), // COMMON | PERSONAL
+  ownerId: text("owner_id").references(() => members.id, {
+    onDelete: "cascade",
+  }),
+  title: text("title").notNull(),
+  description: text("description").default(""),
+  createdAt: text("created_at").notNull(),
+});
+
+export const boardColumns = sqliteTable("board_columns", {
+  id: text("id").primaryKey(),
+  boardId: text("board_id")
+    .notNull()
+    .references(() => boards.id, { onDelete: "cascade" }),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  color: text("color").notNull().default("#787164"),
+  position: integer("position").notNull().default(0),
+});
+
+export const boardCards = sqliteTable("board_cards", {
+  id: text("id").primaryKey(),
+  boardId: text("board_id")
+    .notNull()
+    .references(() => boards.id, { onDelete: "cascade" }),
+  columnId: text("column_id")
+    .notNull()
+    .references(() => boardColumns.id, { onDelete: "cascade" }),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").default(""),
+  cardType: text("card_type").notNull().default("TASK"), // TASK | NOTE
+  noteColor: text("note_color").notNull().default("cream"), // cream | butter | terracotta | sage | sky
+  tagsJson: text("tags_json").notNull().default("[]"),
+  priority: text("priority").notNull().default("MEDIUM"), // LOW | MEDIUM | HIGH | URGENT
+  assigneeId: text("assignee_id").references(() => members.id, {
+    onDelete: "set null",
+  }),
+  resourceId: text("resource_id").references(() => houseResources.id, {
+    onDelete: "set null",
+  }),
+  dueDate: text("due_date").default(""),
+  startTime: text("start_time").default(""),
+  endTime: text("end_time").default(""),
+  syncToCommonCalendar: integer("sync_to_common_calendar", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  linkedEventId: text("linked_event_id").references(() => calendarEvents.id, {
+    onDelete: "set null",
+  }),
+  position: integer("position").notNull().default(0),
+  createdById: text("created_by_id")
+    .notNull()
+    .references(() => members.id, { onDelete: "cascade" }),
+  createdAt: text("created_at").notNull(),
+});
+
+export const roomConfigs = sqliteTable("room_configs", {
+  id: text("id").primaryKey(),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  ownerKey: text("owner_key").notNull(), // "COMMON" or memberId
+  roomTitle: text("room_title").notNull(),
+  theme: text("theme").notNull().default("stone"), // stone | sage | terracotta | butter | midnight
+  bannerQuote: text("banner_quote").default(""),
+  layoutJson: text("layout_json")
+    .notNull()
+    .default('["board","trackers","stickies"]'),
+  decorItemsJson: text("decor_items_json").notNull().default("[]"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const roomKnocks = sqliteTable("room_knocks", {
+  id: text("id").primaryKey(),
+  householdId: text("household_id")
+    .notNull()
+    .references(() => households.id, { onDelete: "cascade" }),
+  visitorId: text("visitor_id")
+    .notNull()
+    .references(() => members.id, { onDelete: "cascade" }),
+  roomOwnerId: text("room_owner_id")
+    .notNull()
+    .references(() => members.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("KNOCKING"), // KNOCKING | ALLOWED | DECLINED | REVOKED
+  createdAt: text("created_at").notNull(),
+  respondedAt: text("responded_at"),
 });
 
 export const trackers = sqliteTable("trackers", {
@@ -85,8 +202,8 @@ export const trackers = sqliteTable("trackers", {
   unit: text("unit").notNull(),
   targetValue: real("target_value").notNull(),
   currentValue: real("current_value").notNull().default(0),
-  cadence: text("cadence").notNull().default("WEEKLY"), // DAILY | WEEKLY | MILESTONE
-  visibility: text("visibility").notNull().default("FAMILY"), // FAMILY | PRIVATE
+  cadence: text("cadence").notNull().default("WEEKLY"),
+  visibility: text("visibility").notNull().default("FAMILY"),
   notes: text("notes").default(""),
   createdAt: text("created_at").notNull(),
 });
@@ -102,7 +219,7 @@ export const trackerLogs = sqliteTable("tracker_logs", {
   memberId: text("member_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
-  date: text("date").notNull(), // YYYY-MM-DD
+  date: text("date").notNull(),
   value: real("value").notNull(),
   note: text("note").default(""),
   createdAt: text("created_at").notNull(),
@@ -114,9 +231,9 @@ export const householdLists = sqliteTable("household_lists", {
     .notNull()
     .references(() => households.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  type: text("type").notNull(), // SHOPPING | MEAL_PREP | CHORES | GENERAL
+  type: text("type").notNull(),
   description: text("description").default(""),
-  visibility: text("visibility").notNull().default("FAMILY"), // FAMILY | ADULTS_ONLY
+  visibility: text("visibility").notNull().default("FAMILY"),
   createdById: text("created_by_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
@@ -138,7 +255,7 @@ export const listItems = sqliteTable("list_items", {
     onDelete: "set null",
   }),
   dueDate: text("due_date").default(""),
-  priority: text("priority").notNull().default("MEDIUM"), // LOW | MEDIUM | HIGH
+  priority: text("priority").notNull().default("MEDIUM"),
   isCompleted: integer("is_completed", { mode: "boolean" })
     .notNull()
     .default(false),

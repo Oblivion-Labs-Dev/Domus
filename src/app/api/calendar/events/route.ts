@@ -2,10 +2,13 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { calendarEvents } from "@/db/schema";
+import { calendarEvents, houseResources } from "@/db/schema";
 import { getCurrentMember } from "@/lib/auth";
 import { can, redactEventForViewer } from "@/lib/rbac";
-import { annotateScheduleOverlaps } from "@/lib/schedule";
+import {
+  annotateScheduleOverlaps,
+  findConflictsForResource,
+} from "@/lib/schedule";
 import { createEventSchema } from "@/lib/validation";
 
 export async function GET() {
@@ -53,6 +56,11 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
+  const resourceId =
+    typeof body?.resourceId === "string" && body.resourceId
+      ? body.resourceId
+      : null;
+
   const participants = Array.from(new Set([actor.id, ...data.participantIds]));
   const wantsShared = data.isShared || participants.length > 1;
 
@@ -66,6 +74,44 @@ export async function POST(request: Request) {
     );
   }
 
+  // Prevent House Gear double-booking!
+  if (resourceId) {
+    const existing = await db
+      .select()
+      .from(calendarEvents)
+      .where(eq(calendarEvents.householdId, actor.householdId));
+    const blocks = existing.map((e) => ({
+      id: e.id,
+      title: e.title,
+      ownerId: e.ownerId,
+      participantIds: [],
+      resourceId: e.resourceId,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      isShared: e.isShared,
+    }));
+    const conflicts = findConflictsForResource(
+      blocks,
+      resourceId,
+      data.startTime,
+      data.endTime
+    );
+    if (conflicts.length > 0) {
+      const resRow = await db
+        .select()
+        .from(houseResources)
+        .where(eq(houseResources.id, resourceId))
+        .limit(1);
+      const gearName = resRow[0]?.name ?? "That House Gear";
+      return NextResponse.json(
+        {
+          error: `${gearName} is already reserved during this time ("${conflicts[0].title}").`,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const id = `evt_${crypto.randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
 
@@ -76,6 +122,7 @@ export async function POST(request: Request) {
     category: data.category,
     ownerId: actor.id,
     participantIdsJson: JSON.stringify(participants),
+    resourceId,
     startTime: data.startTime,
     endTime: data.endTime,
     visibility: data.visibility,

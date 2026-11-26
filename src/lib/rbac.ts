@@ -43,35 +43,35 @@ export const ROLE_META: Record<
     label: "Head of Household",
     badge: "Head",
     description:
-      "Full governance over roles, permissions, household settings, approvals, and schedules.",
+      "Full governance over roles, permissions, household gear, approvals, and schedules. Still knocks before entering private rooms.",
     rank: 5,
   },
   CO_HEAD: {
     label: "Co-Head",
     badge: "Co-Head",
     description:
-      "Co-leads daily operations: manages shared schedules, assigns chores, invites members, and approves Junior bookings.",
+      "Co-leads daily operations: manages shared boards, invites members, approves Junior bookings, and coordinates house gear.",
     rank: 4,
   },
   MEMBER: {
     label: "Family Member",
     badge: "Member",
     description:
-      "Manages own workouts, diet, life plans, and private blocks; collaborates on shared lists and peer time-booking.",
+      "Owns a flexible private room, picks up common tasks, logs personal plans, and books family time or house gear.",
     rank: 3,
   },
   JUNIOR: {
     label: "Junior",
     badge: "Junior",
     description:
-      "Views family schedule, checks off assigned chores, logs personal habits, and requests time bookings with adult approval.",
+      "Owns a private room, claims house tasks, logs personal habits, and requests time bookings with Head/Co-Head approval.",
     rank: 2,
   },
   GUEST: {
     label: "Guest / Helper",
     badge: "Guest",
     description:
-      "Scoped access to shared shopping, meal prep, and chore lists plus public family events; no private or health access.",
+      "Collaborates on the Common Area boards and lists; cannot see private blocks or book family time.",
     rank: 1,
   },
 };
@@ -83,7 +83,7 @@ export const ROLE_CAPABILITY_MATRIX: {
 }[] = [
   {
     action: "calendar:create_personal",
-    label: "Create personal schedule blocks",
+    label: "Create personal schedule blocks & room cards",
     roles: { HEAD: true, CO_HEAD: true, MEMBER: true, JUNIOR: true, GUEST: false },
   },
   {
@@ -93,12 +93,12 @@ export const ROLE_CAPABILITY_MATRIX: {
   },
   {
     action: "calendar:edit_any",
-    label: "Edit or delete any member's event",
+    label: "Edit or delete any member's shared event",
     roles: { HEAD: true, CO_HEAD: true, MEMBER: "Own", JUNIOR: "Own", GUEST: false },
   },
   {
     action: "booking:create",
-    label: "Book another member's time",
+    label: "Book another member's time or House Gear",
     roles: { HEAD: true, CO_HEAD: true, MEMBER: true, JUNIOR: "Approval", GUEST: false },
   },
   {
@@ -108,22 +108,22 @@ export const ROLE_CAPABILITY_MATRIX: {
   },
   {
     action: "tracker:create_own",
-    label: "Track exercise, diet & life plans",
+    label: "Track exercise, diet & life plans in My Room",
     roles: { HEAD: true, CO_HEAD: true, MEMBER: true, JUNIOR: true, GUEST: false },
   },
   {
     action: "list:create_or_delete",
-    label: "Create or delete household lists",
+    label: "Create columns, boards & manage House Gear",
     roles: { HEAD: true, CO_HEAD: true, MEMBER: true, JUNIOR: false, GUEST: false },
   },
   {
     action: "list:add_item",
-    label: "Add & check off shopping / chore items",
+    label: "Pick up common tasks & add board notes",
     roles: { HEAD: true, CO_HEAD: true, MEMBER: true, JUNIOR: true, GUEST: true },
   },
   {
     action: "list:assign_others",
-    label: "Assign chores to other members",
+    label: "Assign tasks to other members",
     roles: { HEAD: true, CO_HEAD: true, MEMBER: true, JUNIOR: false, GUEST: false },
   },
   {
@@ -205,6 +205,25 @@ export function requiresHeadApprovalForBooking(requester: MemberContext): boolea
   return !requester.permissions.canBookWithoutApproval;
 }
 
+/**
+ * Universal Room Privacy:
+ * Nobody can enter another member's room unless they are the room owner
+ * OR the room owner explicitly ALLOWED their knock.
+ */
+export function canEnterRoom(
+  viewerId: string,
+  roomOwnerId: string,
+  knocks: Array<{ visitorId: string; roomOwnerId: string; status: string }>
+): boolean {
+  if (viewerId === roomOwnerId) return true;
+  return knocks.some(
+    (k) =>
+      k.visitorId === viewerId &&
+      k.roomOwnerId === roomOwnerId &&
+      k.status === "ALLOWED"
+  );
+}
+
 export interface RawCalendarEvent {
   id: string;
   householdId: string;
@@ -212,6 +231,7 @@ export interface RawCalendarEvent {
   category: string;
   ownerId: string;
   participantIdsJson: string;
+  resourceId?: string | null;
   startTime: string;
   endTime: string;
   visibility: string;
@@ -227,6 +247,7 @@ export interface SafeCalendarEvent {
   category: string;
   ownerId: string;
   participantIds: string[];
+  resourceId: string | null;
   startTime: string;
   endTime: string;
   visibility: string;
@@ -236,13 +257,6 @@ export interface SafeCalendarEvent {
   isRedacted: boolean;
 }
 
-/**
- * Redacts or filters a calendar event according to the viewing member's role.
- * - PRIVATE events are shown in full to the owner (and participants),
- *   redacted as "Busy" to other household members (so availability & time-booking stay accurate),
- *   and completely hidden from GUESTs.
- * - ADULTS_ONLY events are hidden from JUNIOR and GUEST members.
- */
 export function redactEventForViewer(
   event: RawCalendarEvent,
   viewer: MemberContext
@@ -274,6 +288,7 @@ export function redactEventForViewer(
       category: "PERSONAL",
       ownerId: event.ownerId,
       participantIds: [event.ownerId],
+      resourceId: event.resourceId ?? null,
       startTime: event.startTime,
       endTime: event.endTime,
       visibility: "PRIVATE",
@@ -291,6 +306,7 @@ export function redactEventForViewer(
     ownerId: event.ownerId,
     participantIds:
       participantIds.length > 0 ? participantIds : [event.ownerId],
+    resourceId: event.resourceId ?? null,
     startTime: event.startTime,
     endTime: event.endTime,
     visibility: event.visibility,

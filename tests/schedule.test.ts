@@ -3,6 +3,7 @@ import {
   annotateScheduleOverlaps,
   findAvailableSlots,
   findConflictsForMember,
+  findConflictsForResource,
   intervalsOverlap,
   ScheduleBlock,
 } from "../src/lib/schedule";
@@ -100,5 +101,37 @@ describe("Domus Overlap & Time-Booking Engine", () => {
     expect(priv?.isFamilyOverlap).toBe(false);
     expect(priv?.hasCollision).toBe(true);
     expect(driving?.hasCollision).toBe(true);
+  });
+
+  it("prevents double-booking shared House Gear resources (e.g., Lawn Mower)", () => {
+    const gearBlocks: ScheduleBlock[] = [
+      {
+        id: "evt_mow",
+        title: "Lawn Mowing",
+        ownerId: "dad",
+        participantIds: ["dad"],
+        resourceId: "res_mower",
+        startTime: "2026-11-28T09:00:00.000Z",
+        endTime: "2026-11-28T10:30:00.000Z",
+        isShared: true,
+      },
+    ];
+
+    const conflicts = findConflictsForResource(
+      gearBlocks,
+      "res_mower",
+      "2026-11-28T09:30:00.000Z",
+      "2026-11-28T11:00:00.000Z"
+    );
+    expect(conflicts.length).toBe(1);
+    expect(conflicts[0].reason).toBe("RESOURCE");
+
+    const noConflict = findConflictsForResource(
+      gearBlocks,
+      "res_mower",
+      "2026-11-28T10:30:00.000Z",
+      "2026-11-28T11:30:00.000Z"
+    );
+    expect(noConflict.length).toBe(0);
   });
 });

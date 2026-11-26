@@ -49,6 +49,16 @@ export async function ensureTables(): Promise<void> {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS house_resources (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'GEAR',
+      icon_asset TEXT NOT NULL DEFAULT '/assets/decor-car.png',
+      notes TEXT DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS calendar_events (
       id TEXT PRIMARY KEY,
       household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -56,6 +66,7 @@ export async function ensureTables(): Promise<void> {
       category TEXT NOT NULL DEFAULT 'FAMILY',
       owner_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
       participant_ids_json TEXT NOT NULL DEFAULT '[]',
+      resource_id TEXT REFERENCES house_resources(id) ON DELETE SET NULL,
       start_time TEXT NOT NULL,
       end_time TEXT NOT NULL,
       visibility TEXT NOT NULL DEFAULT 'FAMILY',
@@ -70,6 +81,7 @@ export async function ensureTables(): Promise<void> {
       household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
       requester_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
       target_member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      resource_id TEXT REFERENCES house_resources(id) ON DELETE SET NULL,
       title TEXT NOT NULL,
       category TEXT NOT NULL DEFAULT 'BOOKING',
       notes TEXT DEFAULT '',
@@ -79,6 +91,71 @@ export async function ensureTables(): Promise<void> {
       approved_by_id TEXT REFERENCES members(id) ON DELETE SET NULL,
       created_event_id TEXT REFERENCES calendar_events(id) ON DELETE SET NULL,
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS boards (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      scope TEXT NOT NULL,
+      owner_id TEXT REFERENCES members(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS board_columns (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#787164',
+      position INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS board_cards (
+      id TEXT PRIMARY KEY,
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      column_id TEXT NOT NULL REFERENCES board_columns(id) ON DELETE CASCADE,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      card_type TEXT NOT NULL DEFAULT 'TASK',
+      note_color TEXT NOT NULL DEFAULT 'cream',
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      priority TEXT NOT NULL DEFAULT 'MEDIUM',
+      assignee_id TEXT REFERENCES members(id) ON DELETE SET NULL,
+      resource_id TEXT REFERENCES house_resources(id) ON DELETE SET NULL,
+      due_date TEXT DEFAULT '',
+      start_time TEXT DEFAULT '',
+      end_time TEXT DEFAULT '',
+      sync_to_common_calendar INTEGER NOT NULL DEFAULT 1,
+      linked_event_id TEXT REFERENCES calendar_events(id) ON DELETE SET NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_by_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS room_configs (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      owner_key TEXT NOT NULL,
+      room_title TEXT NOT NULL,
+      theme TEXT NOT NULL DEFAULT 'stone',
+      banner_quote TEXT DEFAULT '',
+      layout_json TEXT NOT NULL DEFAULT '["board","trackers","stickies"]',
+      decor_items_json TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS room_knocks (
+      id TEXT PRIMARY KEY,
+      household_id TEXT NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+      visitor_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      room_owner_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'KNOCKING',
+      created_at TEXT NOT NULL,
+      responded_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS trackers (
@@ -146,6 +223,19 @@ export async function ensureTables(): Promise<void> {
       created_at TEXT NOT NULL
     );
   `);
+
+  // Safe migrations for existing local SQLite databases
+  const safeAlters = [
+    "ALTER TABLE calendar_events ADD COLUMN resource_id TEXT REFERENCES house_resources(id) ON DELETE SET NULL",
+    "ALTER TABLE time_bookings ADD COLUMN resource_id TEXT REFERENCES house_resources(id) ON DELETE SET NULL",
+  ];
+  for (const sql of safeAlters) {
+    try {
+      await client.execute(sql);
+    } catch {
+      // Column already exists
+    }
+  }
 
   initialized = true;
 }

@@ -1,22 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  AlertTriangle,
   CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Layers,
   Lock,
   Trash2,
   UserCheck,
-  Users,
+  Wrench,
 } from "lucide-react";
 import { can, canEditOrDeleteEvent, MemberContext } from "@/lib/rbac";
 import {
   CalendarEventDTO,
   formatShortDate,
   formatTimeRange,
+  HouseResourceDTO,
   MemberDTO,
   TimeBookingDTO,
 } from "./types";
@@ -33,6 +35,29 @@ interface CalendarViewProps {
   initialBookMemberId?: string;
 }
 
+const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 7 AM to 9 PM
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+function toDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function CalendarView({
   currentMember,
   members,
@@ -40,11 +65,12 @@ export default function CalendarView({
 }: CalendarViewProps) {
   const [events, setEvents] = useState<CalendarEventDTO[]>([]);
   const [bookings, setBookings] = useState<TimeBookingDTO[]>([]);
-  const [modeFilter, setModeFilter] = useState<"ALL" | "OVERLAP" | "INDIVIDUAL">(
-    "ALL"
+  const [resources, setResources] = useState<HouseResourceDTO[]>([]);
+  const [viewMode, setViewMode] = useState<"DAILY" | "WEEKLY" | "YEARLY">(
+    "WEEKLY"
   );
+  const [anchorDate, setAnchorDate] = useState<Date>(() => new Date());
   const [memberFilter, setMemberFilter] = useState<string>("ALL");
-  const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<{
     type: "ok" | "err";
     text: string;
@@ -54,9 +80,7 @@ export default function CalendarView({
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [evtTitle, setEvtTitle] = useState("");
   const [evtCategory, setEvtCategory] = useState("FAMILY");
-  const [evtDate, setEvtDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [evtDate, setEvtDate] = useState(() => toDateKey(new Date()));
   const [evtStart, setEvtStart] = useState("10:00");
   const [evtEnd, setEvtEnd] = useState("11:00");
   const [evtVisibility, setEvtVisibility] = useState<
@@ -64,6 +88,7 @@ export default function CalendarView({
   >("FAMILY");
   const [evtShared, setEvtShared] = useState(true);
   const [evtParticipants, setEvtParticipants] = useState<string[]>([]);
+  const [evtResourceId, setEvtResourceId] = useState("");
   const [evtLocation, setEvtLocation] = useState("");
 
   // Book someone's time state
@@ -72,9 +97,7 @@ export default function CalendarView({
       ? initialBookMemberId
       : members.find((m) => m.id !== currentMember.id)?.id ?? "";
   const [bookTargetId, setBookTargetId] = useState(defaultTarget);
-  const [bookDate, setBookDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [bookDate, setBookDate] = useState(() => toDateKey(new Date()));
   const [bookDuration, setBookDuration] = useState(60);
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
@@ -83,36 +106,31 @@ export default function CalendarView({
   const [bookCategory, setBookCategory] = useState("DRIVING");
 
   const memberById = new Map(members.map((m) => [m.id, m]));
+  const resourceById = new Map(resources.map((r) => [r.id, r]));
 
   async function loadAll() {
-    setLoading(true);
-    try {
-      const [evRes, bkRes] = await Promise.all([
-        fetch("/api/calendar/events"),
-        fetch("/api/calendar/bookings"),
-      ]);
-      if (evRes.ok) {
-        const d = await evRes.json();
-        setEvents(d.events ?? []);
-      }
-      if (bkRes.ok) {
-        const d = await bkRes.json();
-        setBookings(d.bookings ?? []);
-      }
-    } finally {
-      setLoading(false);
+    const [evRes, bkRes, resRes] = await Promise.all([
+      fetch("/api/calendar/events"),
+      fetch("/api/calendar/bookings"),
+      fetch("/api/resources"),
+    ]);
+    if (evRes.ok) {
+      const d = await evRes.json();
+      setEvents(d.events ?? []);
+    }
+    if (bkRes.ok) {
+      const d = await bkRes.json();
+      setBookings(d.bookings ?? []);
+    }
+    if (resRes.ok) {
+      const d = await resRes.json();
+      setResources(d.resources ?? []);
     }
   }
 
   useEffect(() => {
     loadAll();
   }, [currentMember.id]);
-
-  useEffect(() => {
-    if (initialBookMemberId && initialBookMemberId !== currentMember.id) {
-      setBookTargetId(initialBookMemberId);
-    }
-  }, [initialBookMemberId, currentMember.id]);
 
   useEffect(() => {
     if (!bookTargetId || !bookDate) return;
@@ -125,6 +143,50 @@ export default function CalendarView({
         setSelectedSlot((d.slots ?? [])[0] ?? null);
       });
   }, [bookTargetId, bookDate, bookDuration, events.length]);
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((evt) => {
+      if (
+        memberFilter !== "ALL" &&
+        evt.ownerId !== memberFilter &&
+        !evt.participantIds.includes(memberFilter)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [events, memberFilter]);
+
+  // Compute 7 days of current week starting Sunday
+  const weekDays = useMemo(() => {
+    const start = new Date(anchorDate);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - start.getDay());
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d;
+    });
+  }, [anchorDate]);
+
+  const eventsByDayKey = useMemo(() => {
+    const map = new Map<string, CalendarEventDTO[]>();
+    for (const evt of filteredEvents) {
+      const key = toDateKey(new Date(evt.startTime));
+      const list = map.get(key) ?? [];
+      list.push(evt);
+      map.set(key, list);
+    }
+    return map;
+  }, [filteredEvents]);
+
+  function stepDate(delta: number) {
+    const next = new Date(anchorDate);
+    if (viewMode === "DAILY") next.setDate(next.getDate() + delta);
+    else if (viewMode === "WEEKLY") next.setDate(next.getDate() + delta * 7);
+    else next.setFullYear(next.getFullYear() + delta);
+    setAnchorDate(next);
+  }
 
   async function handleCreateEvent(e: React.FormEvent) {
     e.preventDefault();
@@ -139,6 +201,7 @@ export default function CalendarView({
         title: evtTitle,
         category: evtCategory,
         participantIds: evtShared ? evtParticipants : [],
+        resourceId: evtResourceId || null,
         startTime,
         endTime,
         visibility: evtVisibility,
@@ -153,29 +216,20 @@ export default function CalendarView({
     }
     setEvtTitle("");
     setEvtLocation("");
+    setEvtResourceId("");
     setShowAddEvent(false);
-    setFeedback({ type: "ok", text: "Added to the common calendar." });
+    setFeedback({ type: "ok", text: "Scheduled on the Domus Calendar!" });
     await loadAll();
   }
 
   async function handleDeleteEvent(id: string) {
-    setFeedback(null);
     const res = await fetch(`/api/calendar/events/${id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (!res.ok) {
-      setFeedback({ type: "err", text: data.error ?? "Permission denied" });
-      return;
-    }
-    setFeedback({ type: "ok", text: "Event removed." });
-    await loadAll();
+    if (res.ok) await loadAll();
   }
 
   async function handleBookTime(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedSlot) {
-      setFeedback({ type: "err", text: "Select an available slot first." });
-      return;
-    }
+    if (!selectedSlot) return;
     setFeedback(null);
     const res = await fetch("/api/calendar/bookings", {
       method: "POST",
@@ -200,7 +254,7 @@ export default function CalendarView({
       type: "ok",
       text:
         data.status === "AWAITING_HEAD_APPROVAL"
-          ? "Booking submitted! Because you are a Junior member, it was sent to Head/Co-Head for approval."
+          ? "Booking sent to Head/Co-Head for Junior approval!"
           : "Time-booking request sent!",
     });
     await loadAll();
@@ -210,70 +264,60 @@ export default function CalendarView({
     id: string,
     action: "ACCEPT" | "DECLINE" | "APPROVE" | "CANCEL"
   ) {
-    setFeedback(null);
     const res = await fetch(`/api/calendar/bookings/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setFeedback({ type: "err", text: data.error ?? "Action failed" });
-      return;
-    }
-    setFeedback({ type: "ok", text: `Booking updated (${data.status}).` });
-    await loadAll();
+    if (res.ok) await loadAll();
   }
-
-  const filteredEvents = events.filter((evt) => {
-    if (modeFilter === "OVERLAP" && !evt.isFamilyOverlap) return false;
-    if (modeFilter === "INDIVIDUAL" && evt.isFamilyOverlap) return false;
-    if (
-      memberFilter !== "ALL" &&
-      evt.ownerId !== memberFilter &&
-      !evt.participantIds.includes(memberFilter)
-    ) {
-      return false;
-    }
-    return true;
-  });
 
   const canCreate = can(currentMember, "calendar:create_personal");
   const canCreateShared = can(currentMember, "calendar:create_shared");
   const canBook = can(currentMember, "booking:create");
   const canApprove = can(currentMember, "booking:approve_others");
 
+  const anchorKey = toDateKey(anchorDate);
+  const dailyEvents = eventsByDayKey.get(anchorKey) ?? [];
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-terracotta-600">
-            Overlap Engine
-          </p>
-          <h2 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-            Common Calendar &amp; Time-Booking
-          </h2>
-          <p className="text-sm text-stone-500">
-            See overlapping family moments alongside individual routines, and
-            book someone&apos;s open time without double-booking.
-          </p>
+      {/* Header with 2.5D Calendar Asset */}
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/calendar-3d.png"
+            alt="Calendar"
+            className="hidden h-16 w-16 shrink-0 rounded-2xl border-2 border-white bg-[#faf9f5] object-cover shadow-md sm:block"
+          />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
+              Daily · Weekly · Yearly
+            </p>
+            <h2 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+              Household &amp; Personal Calendar
+            </h2>
+            <p className="text-sm text-stone-500">
+              Board tasks with dates auto-sync here alongside family overlaps,
+              House Gear reservations &amp; time-booking.
+            </p>
+          </div>
         </div>
 
         {canCreate && (
           <button
             onClick={() => setShowAddEvent((v) => !v)}
-            className="domus-btn-primary"
+            className="domus-btn-primary whitespace-nowrap"
           >
             <CalendarPlus className="h-4 w-4" />
-            {showAddEvent ? "Close Form" : "Add Plan / Block"}
+            {showAddEvent ? "Close Form" : "Add Event"}
           </button>
         )}
       </div>
 
       {feedback && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
+        <div
           className={`rounded-xl border px-4 py-2.5 text-sm font-medium ${
             feedback.type === "ok"
               ? "border-sage-200 bg-sage-50 text-sage-700"
@@ -281,24 +325,23 @@ export default function CalendarView({
           }`}
         >
           {feedback.text}
-        </motion.div>
+        </div>
       )}
 
-      {/* Animated Spring Add Event Drawer */}
+      {/* Add Event Drawer */}
       <AnimatePresence>
         {showAddEvent && canCreate && (
           <motion.form
-            initial={{ opacity: 0, y: -12, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.985 }}
-            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
             onSubmit={handleCreateEvent}
             className="domus-card space-y-4 p-5"
           >
             <h3 className="text-sm font-bold text-stone-900">
-              Schedule a New Household or Individual Plan
+              Schedule Event or Reserve House Gear
             </h3>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-xs font-semibold text-stone-600">
                   Title
@@ -307,27 +350,25 @@ export default function CalendarView({
                   required
                   value={evtTitle}
                   onChange={(e) => setEvtTitle(e.target.value)}
-                  placeholder="e.g., Driving Lesson, Evening Yoga, Grocery Run"
+                  placeholder="e.g., Driving Lesson, Yoga, Lawn Mowing"
                   className="domus-input"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-stone-600">
-                  Category
+                  Reserve House Gear
                 </label>
                 <select
-                  value={evtCategory}
-                  onChange={(e) => setEvtCategory(e.target.value)}
+                  value={evtResourceId}
+                  onChange={(e) => setEvtResourceId(e.target.value)}
                   className="domus-input"
                 >
-                  <option value="FAMILY">Family Shared</option>
-                  <option value="DRIVING">Driving Lessons</option>
-                  <option value="YOGA">Yoga</option>
-                  <option value="EXERCISE">Exercise</option>
-                  <option value="DIET">Diet / Meal Prep</option>
-                  <option value="SHOPPING">Shopping</option>
-                  <option value="CHORE">Chore / Lawn</option>
-                  <option value="PERSONAL">Personal</option>
+                  <option value="">None</option>
+                  {resources.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -343,7 +384,7 @@ export default function CalendarView({
                   }
                   className="domus-input"
                 >
-                  <option value="FAMILY">Family (Visible to all)</option>
+                  <option value="FAMILY">Family Shared</option>
                   <option value="ADULTS_ONLY">Adults Only</option>
                   <option value="PRIVATE">Private (Shows as Busy)</option>
                 </select>
@@ -362,7 +403,7 @@ export default function CalendarView({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-stone-600">
-                  Start Time
+                  Start
                 </label>
                 <input
                   type="time"
@@ -374,7 +415,7 @@ export default function CalendarView({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-stone-600">
-                  End Time
+                  End
                 </label>
                 <input
                   type="time"
@@ -386,19 +427,27 @@ export default function CalendarView({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-stone-600">
-                  Location
+                  Category
                 </label>
-                <input
-                  value={evtLocation}
-                  onChange={(e) => setEvtLocation(e.target.value)}
-                  placeholder="Home / Costco / Gym"
+                <select
+                  value={evtCategory}
+                  onChange={(e) => setEvtCategory(e.target.value)}
                   className="domus-input"
-                />
+                >
+                  <option value="FAMILY">Family</option>
+                  <option value="DRIVING">Driving</option>
+                  <option value="YOGA">Yoga</option>
+                  <option value="EXERCISE">Exercise</option>
+                  <option value="DIET">Diet / Meal Prep</option>
+                  <option value="SHOPPING">Shopping</option>
+                  <option value="CHORE">Chore / Lawn</option>
+                  <option value="PERSONAL">Personal</option>
+                </select>
               </div>
             </div>
 
             {canCreateShared && (
-              <div className="space-y-2 border-t border-stone-100 pt-3">
+              <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
                 <label className="inline-flex items-center gap-2 text-xs font-semibold text-stone-700">
                   <input
                     type="checkbox"
@@ -406,39 +455,34 @@ export default function CalendarView({
                     onChange={(e) => setEvtShared(e.target.checked)}
                     className="rounded border-stone-300"
                   />
-                  Mark as Shared / Overlapping Event &amp; invite family members
+                  Invite Family:
                 </label>
-                {evtShared && (
-                  <div className="flex flex-wrap gap-2">
-                    {members
-                      .filter((m) => m.id !== currentMember.id)
-                      .map((m) => {
-                        const active = evtParticipants.includes(m.id);
-                        return (
-                          <motion.button
-                            key={m.id}
-                            type="button"
-                            whileHover={{ y: -1 }}
-                            whileTap={{ scale: 0.96 }}
-                            onClick={() =>
-                              setEvtParticipants((prev) =>
-                                active
-                                  ? prev.filter((id) => id !== m.id)
-                                  : [...prev, m.id]
-                              )
-                            }
-                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                {evtShared &&
+                  members
+                    .filter((m) => m.id !== currentMember.id)
+                    .map((m) => {
+                      const active = evtParticipants.includes(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() =>
+                            setEvtParticipants((prev) =>
                               active
-                                ? "border-stone-900 bg-stone-900 text-white shadow-sm"
-                                : "border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100"
-                            }`}
-                          >
-                            {m.name}
-                          </motion.button>
-                        );
-                      })}
-                  </div>
-                )}
+                                ? prev.filter((id) => id !== m.id)
+                                : [...prev, m.id]
+                            )
+                          }
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            active
+                              ? "bg-stone-900 text-white"
+                              : "bg-stone-100 text-stone-600"
+                          }`}
+                        >
+                          {m.name}
+                        </button>
+                      );
+                    })}
               </div>
             )}
 
@@ -446,389 +490,468 @@ export default function CalendarView({
               <button
                 type="button"
                 onClick={() => setShowAddEvent(false)}
-                className="domus-btn-secondary"
+                className="domus-btn-secondary text-xs"
               >
                 Cancel
               </button>
-              <button type="submit" className="domus-btn-primary">
-                Save to Calendar
+              <button type="submit" className="domus-btn-primary text-xs">
+                Save Event
               </button>
             </div>
           </motion.form>
         )}
       </AnimatePresence>
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left 7 cols: Unified Calendar Stream */}
-        <div className="space-y-4 lg:col-span-7">
-          {/* 2.5D Filter Bar with Spring Pill */}
-          <div className="domus-card flex flex-wrap items-center justify-between gap-3 p-3.5">
-            <div className="flex rounded-xl bg-stone-100 p-1 text-xs font-semibold">
-              {(
-                [
-                  ["ALL", "All Plans"],
-                  ["OVERLAP", "Overlapping / Shared"],
-                  ["INDIVIDUAL", "Individual Only"],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setModeFilter(key)}
-                  className={`relative rounded-lg px-3 py-1.5 transition-colors ${
-                    modeFilter === key
-                      ? "text-stone-900"
-                      : "text-stone-500 hover:text-stone-900"
-                  }`}
-                >
-                  {modeFilter === key && (
-                    <motion.span
-                      layoutId="calendar-mode-pill"
-                      transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 30,
-                      }}
-                      className="absolute inset-0 rounded-lg bg-white shadow-sm"
-                    />
-                  )}
-                  <span className="relative z-10">{label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
+      {/* Toolbar: Daily / Weekly / Yearly + Date Nav + Member Filter */}
+      <div className="domus-card flex flex-wrap items-center justify-between gap-3 p-3.5">
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-xl bg-stone-100 p-1 text-xs font-bold">
+            {(["DAILY", "WEEKLY", "YEARLY"] as const).map((mode) => (
               <button
-                onClick={() => setMemberFilter("ALL")}
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                  memberFilter === "ALL"
-                    ? "bg-stone-900 text-white shadow-sm"
-                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`relative whitespace-nowrap rounded-lg px-3 py-1.5 transition-colors ${
+                  viewMode === mode
+                    ? "text-white"
+                    : "text-stone-600 hover:text-stone-900"
                 }`}
               >
-                Everyone
+                {viewMode === mode && (
+                  <motion.span
+                    layoutId="cal-view-mode"
+                    transition={{ type: "spring", stiffness: 420, damping: 30 }}
+                    className="absolute inset-0 rounded-lg bg-stone-900"
+                  />
+                )}
+                <span className="relative z-10">
+                  {mode === "DAILY"
+                    ? "Daily"
+                    : mode === "WEEKLY"
+                      ? "Weekly"
+                      : "Yearly"}
+                </span>
               </button>
-              {members.map((m) => (
-                <motion.button
-                  key={m.id}
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => setMemberFilter(m.id)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                    memberFilter === m.id
-                      ? "text-white shadow-sm"
-                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                  }`}
-                  style={
-                    memberFilter === m.id ? { backgroundColor: m.color } : undefined
-                  }
-                >
-                  {m.name}
-                </motion.button>
-              ))}
-            </div>
+            ))}
           </div>
 
-          {/* 2.5D Tactile Events List */}
-          <div className="space-y-3">
-            {loading ? (
-              <div className="domus-card p-8 text-center text-sm text-stone-400">
-                Loading common calendar...
-              </div>
-            ) : filteredEvents.length === 0 ? (
-              <div className="domus-card p-8 text-center text-sm text-stone-500">
-                No calendar blocks match this filter.
-              </div>
-            ) : (
-              filteredEvents.map((evt, idx) => {
-                const owner = memberById.get(evt.ownerId);
-                const removable = canEditOrDeleteEvent(evt, currentMember);
-                return (
-                  <motion.div
-                    key={evt.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    className={`domus-card-interactive flex items-start justify-between gap-4 border-l-4 p-4 ${
-                      evt.isFamilyOverlap
-                        ? "border-l-terracotta-500"
-                        : "border-l-stone-300"
-                    }`}
-                  >
-                    <div className="min-w-0 space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-600">
-                          {evt.category}
-                        </span>
-                        {evt.isFamilyOverlap ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-terracotta-100 px-2 py-0.5 text-[10px] font-bold text-terracotta-700">
-                            <Layers className="h-3 w-3" />
-                            Overlapping / Shared
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
-                            Individual
-                          </span>
-                        )}
-                        {evt.isRedacted && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-bold text-stone-700">
-                            <Lock className="h-3 w-3" />
-                            Private Block
-                          </span>
-                        )}
-                        {evt.hasCollision && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                            <AlertTriangle className="h-3 w-3" />
-                            Schedule Overlap
-                          </span>
-                        )}
-                      </div>
-
-                      <h4 className="text-base font-bold text-stone-900">
-                        {evt.title}
-                      </h4>
-
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
-                        <span className="inline-flex items-center gap-1 font-semibold text-stone-700">
-                          <Clock className="h-3.5 w-3.5" />
-                          {formatShortDate(evt.startTime)} ·{" "}
-                          {formatTimeRange(evt.startTime, evt.endTime)}
-                        </span>
-                        {evt.location && <span>📍 {evt.location}</span>}
-                      </div>
-
-                      {evt.notes && !evt.isRedacted && (
-                        <p className="text-xs text-stone-500">{evt.notes}</p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                        <Users className="h-3.5 w-3.5 text-stone-400" />
-                        {evt.participantIds.map((pid) => {
-                          const m = memberById.get(pid);
-                          if (!m) return null;
-                          return (
-                            <span
-                              key={pid}
-                              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm"
-                              style={{ backgroundColor: m.color }}
-                            >
-                              {m.name}
-                            </span>
-                          );
-                        })}
-                        {evt.participantIds.length === 0 && owner && (
-                          <span className="text-xs text-stone-500">
-                            {owner.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {removable && !evt.isRedacted && (
-                      <motion.button
-                        whileHover={{ scale: 1.12 }}
-                        whileTap={{ scale: 0.92 }}
-                        onClick={() => handleDeleteEvent(evt.id)}
-                        title="Remove event"
-                        className="rounded-lg p-1.5 text-stone-400 transition hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </motion.button>
-                    )}
-                  </motion.div>
-                );
-              })
-            )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => stepDate(-1)}
+              className="rounded-lg border border-stone-200 bg-white p-1.5 text-stone-600 hover:bg-stone-100"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setAnchorDate(new Date())}
+              className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-bold text-stone-700 hover:bg-stone-100"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => stepDate(1)}
+              className="rounded-lg border border-stone-200 bg-white p-1.5 text-stone-600 hover:bg-stone-100"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
+
+          <span className="ml-1 text-sm font-bold text-stone-900">
+            {viewMode === "YEARLY"
+              ? anchorDate.getFullYear()
+              : viewMode === "DAILY"
+                ? anchorDate.toLocaleDateString([], {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })
+                : `${weekDays[0].toLocaleDateString([], { month: "short", day: "numeric" })} – ${weekDays[6].toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`}
+          </span>
         </div>
 
-        {/* Right 5 cols: Book Someone's Time + Bookings Queue */}
-        <div className="space-y-6 lg:col-span-5">
-          <div className="domus-card p-5">
-            <div className="mb-3.5 flex items-center gap-2">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-xl bg-terracotta-100 text-terracotta-600"
-                style={{ boxShadow: "0 2px 0 0 rgba(212,99,62,0.22)" }}
-              >
-                <UserCheck className="h-4 w-4" />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setMemberFilter("ALL")}
+            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+              memberFilter === "ALL"
+                ? "bg-stone-900 text-white"
+                : "bg-stone-100 text-stone-600"
+            }`}
+          >
+            Everyone
+          </button>
+          {members.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setMemberFilter(m.id)}
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                memberFilter === m.id
+                  ? "text-white"
+                  : "bg-stone-100 text-stone-600"
+              }`}
+              style={
+                memberFilter === m.id ? { backgroundColor: m.color } : undefined
+              }
+            >
+              {m.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Main Calendar Surface (8 cols) */}
+        <div className="lg:col-span-8">
+          {/* WEEKLY VIEW (Google / Notion Style 7-Day Grid) */}
+          {viewMode === "WEEKLY" && (
+            <div className="domus-card overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-stone-200 bg-stone-50/90">
+                {weekDays.map((d) => {
+                  const key = toDateKey(d);
+                  const isToday = key === toDateKey(new Date());
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setAnchorDate(d);
+                        setViewMode("DAILY");
+                      }}
+                      className={`border-r border-stone-200/70 px-2 py-3 text-center transition last:border-r-0 hover:bg-white ${
+                        isToday ? "bg-terracotta-50/70" : ""
+                      }`}
+                    >
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                        {d.toLocaleDateString([], { weekday: "short" })}
+                      </p>
+                      <p
+                        className={`mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                          isToday
+                            ? "bg-terracotta-500 text-white shadow-sm"
+                            : "text-stone-800"
+                        }`}
+                      >
+                        {d.getDate()}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-stone-900">
-                  Book a Family Member&apos;s Time
-                </h3>
-                <p className="text-[11px] text-stone-500">
-                  Conflict-free slots checked automatically
-                </p>
+
+              <div className="grid min-h-[420px] grid-cols-7 divide-x divide-stone-100 bg-white">
+                {weekDays.map((d) => {
+                  const key = toDateKey(d);
+                  const dayEvts = eventsByDayKey.get(key) ?? [];
+                  return (
+                    <div key={key} className="space-y-2 p-2">
+                      {dayEvts.length === 0 ? (
+                        <p className="pt-8 text-center text-[10px] text-stone-300">
+                          Open
+                        </p>
+                      ) : (
+                        dayEvts.map((evt) => {
+                          const owner = memberById.get(evt.ownerId);
+                          const gear = evt.resourceId
+                            ? resourceById.get(evt.resourceId)
+                            : null;
+                          return (
+                            <motion.div
+                              key={evt.id}
+                              whileHover={{ y: -2, scale: 1.02 }}
+                              className="rounded-xl border border-stone-200/90 bg-stone-50/90 p-2 text-left shadow-sm"
+                              style={{
+                                borderLeftWidth: 3,
+                                borderLeftColor: evt.isFamilyOverlap
+                                  ? "#d4633e"
+                                  : owner?.color ?? "#787164",
+                              }}
+                            >
+                              <p className="line-clamp-2 text-[11px] font-bold leading-tight text-stone-900">
+                                {evt.isRedacted && (
+                                  <Lock className="mr-1 inline h-2.5 w-2.5 text-stone-400" />
+                                )}
+                                {evt.title}
+                              </p>
+                              <p className="mt-1 text-[10px] text-stone-500">
+                                {new Date(evt.startTime).toLocaleTimeString(
+                                  [],
+                                  { hour: "numeric", minute: "2-digit" }
+                                )}
+                              </p>
+                              {gear && (
+                                <p className="mt-1 truncate text-[9px] font-bold text-terracotta-600">
+                                  🔧 {gear.name}
+                                </p>
+                              )}
+                            </motion.div>
+                          );
+                        })
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
+          )}
 
-            {!canBook ? (
-              <p className="rounded-xl bg-stone-50 p-4 text-xs text-stone-500">
-                Guests have read-only calendar access and cannot book family
-                members&apos; time.
-              </p>
-            ) : (
-              <form onSubmit={handleBookTime} className="space-y-3.5">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
-                      Who do you need?
-                    </label>
-                    <select
-                      value={bookTargetId}
-                      onChange={(e) => setBookTargetId(e.target.value)}
-                      className="domus-input"
-                    >
-                      {members
-                        .filter((m) => m.id !== currentMember.id)
-                        .map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name} ({m.role})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
-                      Date
-                    </label>
-                    <input
-                      type="date"
-                      value={bookDate}
-                      onChange={(e) => setBookDate(e.target.value)}
-                      className="domus-input"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
-                      Duration
-                    </label>
-                    <select
-                      value={bookDuration}
-                      onChange={(e) => setBookDuration(Number(e.target.value))}
-                      className="domus-input"
-                    >
-                      <option value={30}>30 minutes</option>
-                      <option value={60}>1 hour</option>
-                      <option value={90}>1.5 hours</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
-                      Activity Type
-                    </label>
-                    <select
-                      value={bookCategory}
-                      onChange={(e) => setBookCategory(e.target.value)}
-                      className="domus-input"
-                    >
-                      <option value="DRIVING">Driving Practice</option>
-                      <option value="YOGA">Yoga / Workout</option>
-                      <option value="DIET">Meal Prep</option>
-                      <option value="SHOPPING">Shopping / Errand</option>
-                      <option value="CHORE">Home / Yard Help</option>
-                      <option value="BOOKING">General Time</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-stone-600">
-                    Open Conflict-Free Slots ({slots.length} available)
-                  </label>
-                  {slots.length === 0 ? (
-                    <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
-                      No completely open slots found on this day. Try another
-                      date or shorter duration.
-                    </p>
-                  ) : (
-                    <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto p-0.5">
-                      {slots.map((slot) => {
-                        const active =
-                          selectedSlot?.startTime === slot.startTime;
+          {/* DAILY VIEW (Hourly Timeline) */}
+          {viewMode === "DAILY" && (
+            <div className="domus-card divide-y divide-stone-100 overflow-hidden">
+              {HOURS.map((hour) => {
+                const slotEvts = dailyEvents.filter(
+                  (e) => new Date(e.startTime).getHours() === hour
+                );
+                const label =
+                  hour === 12
+                    ? "12 PM"
+                    : hour > 12
+                      ? `${hour - 12} PM`
+                      : `${hour} AM`;
+                return (
+                  <div
+                    key={hour}
+                    className="grid min-h-[54px] grid-cols-12 items-start bg-white px-4 py-2"
+                  >
+                    <span className="col-span-2 pt-1 text-[11px] font-bold text-stone-400">
+                      {label}
+                    </span>
+                    <div className="col-span-10 space-y-2">
+                      {slotEvts.map((evt) => {
+                        const gear = evt.resourceId
+                          ? resourceById.get(evt.resourceId)
+                          : null;
+                        const removable = canEditOrDeleteEvent(
+                          evt,
+                          currentMember
+                        );
                         return (
-                          <motion.button
-                            key={slot.startTime}
-                            type="button"
-                            whileHover={{ y: -2 }}
-                            whileTap={{ y: 1, scale: 0.97 }}
-                            onClick={() => setSelectedSlot(slot)}
-                            className={`rounded-xl border px-2.5 py-2 text-left text-xs font-semibold transition ${
-                              active
-                                ? "border-terracotta-500 bg-terracotta-50 text-terracotta-700"
-                                : "border-stone-200 bg-white text-stone-700 hover:border-stone-400"
+                          <div
+                            key={evt.id}
+                            className={`domus-tile flex items-start justify-between gap-3 border-l-4 p-3 ${
+                              evt.isFamilyOverlap
+                                ? "border-l-terracotta-500"
+                                : "border-l-stone-400"
                             }`}
-                            style={{
-                              boxShadow: active
-                                ? "0 3px 0 0 #d4633e"
-                                : "0 2px 0 0 #e6e2d8",
-                            }}
                           >
-                            {slot.label}
-                          </motion.button>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="text-xs font-bold text-stone-900">
+                                  {evt.title}
+                                </p>
+                                {evt.isFamilyOverlap && (
+                                  <span className="inline-flex items-center gap-0.5 rounded-full bg-terracotta-100 px-2 py-0.5 text-[10px] font-bold text-terracotta-700">
+                                    <Layers className="h-2.5 w-2.5" />
+                                    Overlap
+                                  </span>
+                                )}
+                                {gear && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-700">
+                                    <Wrench className="h-2.5 w-2.5 text-terracotta-500" />
+                                    {gear.name}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-[11px] text-stone-500">
+                                <Clock className="mr-1 inline h-3 w-3" />
+                                {formatTimeRange(evt.startTime, evt.endTime)}
+                                {evt.location ? ` · ${evt.location}` : ""}
+                              </p>
+                            </div>
+                            {removable && !evt.isRedacted && (
+                              <button
+                                onClick={() => handleDeleteEvent(evt.id)}
+                                className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-stone-600">
-                    What is this time for?
-                  </label>
+          {/* YEARLY VIEW (Full 12-Month Heatmap Grid) */}
+          {viewMode === "YEARLY" && (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {MONTHS.map((monthName, monthIdx) => {
+                const year = anchorDate.getFullYear();
+                const firstDay = new Date(year, monthIdx, 1).getDay();
+                const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+                const cells = Array.from({ length: firstDay + daysInMonth });
+                return (
+                  <div key={monthName} className="domus-card p-3.5">
+                    <h4 className="mb-2 text-xs font-bold text-stone-900">
+                      {monthName} {year}
+                    </h4>
+                    <div className="mb-1 grid grid-cols-7 text-center text-[9px] font-bold text-stone-400">
+                      {["S", "M", "T", "W", "T", "F", "S"].map((w, wi) => (
+                        <span key={wi}>{w}</span>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-0.5">
+                      {cells.map((_, ci) => {
+                        const dayNum = ci - firstDay + 1;
+                        if (dayNum < 1) return <span key={ci} />;
+                        const cellDate = new Date(year, monthIdx, dayNum);
+                        const key = toDateKey(cellDate);
+                        const count = (eventsByDayKey.get(key) ?? []).length;
+                        const isToday = key === toDateKey(new Date());
+                        return (
+                          <button
+                            key={ci}
+                            onClick={() => {
+                              setAnchorDate(cellDate);
+                              setViewMode("DAILY");
+                            }}
+                            title={
+                              count > 0
+                                ? `${count} plan(s) on ${monthName} ${dayNum}`
+                                : `${monthName} ${dayNum}`
+                            }
+                            className={`flex h-6 w-6 flex-col items-center justify-center rounded-md text-[10px] font-semibold transition hover:scale-110 ${
+                              isToday
+                                ? "bg-stone-900 text-white"
+                                : count >= 2
+                                  ? "bg-terracotta-500 text-white"
+                                  : count === 1
+                                    ? "bg-sage-200 text-sage-800"
+                                    : "text-stone-600 hover:bg-stone-100"
+                            }`}
+                          >
+                            {dayNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right 4 cols: Book Someone's Time + Queue */}
+        <div className="space-y-5 lg:col-span-4">
+          <div className="domus-card p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-terracotta-500" />
+              <h3 className="text-sm font-bold text-stone-900">
+                Book Someone&apos;s Time
+              </h3>
+            </div>
+
+            {!canBook ? (
+              <p className="rounded-xl bg-stone-50 p-3 text-xs text-stone-500">
+                Guests cannot book family members&apos; time.
+              </p>
+            ) : (
+              <form onSubmit={handleBookTime} className="space-y-3">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <select
+                    value={bookTargetId}
+                    onChange={(e) => setBookTargetId(e.target.value)}
+                    className="domus-input text-xs"
+                  >
+                    {members
+                      .filter((m) => m.id !== currentMember.id)
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                  </select>
                   <input
-                    required
-                    value={bookTitle}
-                    onChange={(e) => setBookTitle(e.target.value)}
-                    placeholder="e.g., Parallel parking practice before DMV test"
-                    className="domus-input"
+                    type="date"
+                    value={bookDate}
+                    onChange={(e) => setBookDate(e.target.value)}
+                    className="domus-input text-xs"
                   />
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-stone-600">
-                    Notes (optional)
-                  </label>
-                  <input
-                    value={bookNotes}
-                    onChange={(e) => setBookNotes(e.target.value)}
-                    placeholder="Any prep needed or location details"
-                    className="domus-input"
-                  />
+                <div className="grid grid-cols-2 gap-2.5">
+                  <select
+                    value={bookDuration}
+                    onChange={(e) => setBookDuration(Number(e.target.value))}
+                    className="domus-input text-xs"
+                  >
+                    <option value={30}>30 mins</option>
+                    <option value={60}>1 hour</option>
+                    <option value={90}>1.5 hours</option>
+                  </select>
+                  <select
+                    value={bookCategory}
+                    onChange={(e) => setBookCategory(e.target.value)}
+                    className="domus-input text-xs"
+                  >
+                    <option value="DRIVING">Driving</option>
+                    <option value="YOGA">Yoga</option>
+                    <option value="DIET">Meal Prep</option>
+                    <option value="SHOPPING">Shopping</option>
+                    <option value="CHORE">Chore</option>
+                  </select>
                 </div>
+
+                <div className="grid max-h-32 grid-cols-2 gap-1.5 overflow-y-auto">
+                  {slots.map((slot) => {
+                    const active = selectedSlot?.startTime === slot.startTime;
+                    return (
+                      <button
+                        key={slot.startTime}
+                        type="button"
+                        onClick={() => setSelectedSlot(slot)}
+                        className={`rounded-xl border px-2 py-1.5 text-left text-[11px] font-semibold ${
+                          active
+                            ? "border-terracotta-500 bg-terracotta-50 text-terracotta-700"
+                            : "border-stone-200 bg-white text-stone-700"
+                        }`}
+                      >
+                        {slot.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <input
+                  required
+                  value={bookTitle}
+                  onChange={(e) => setBookTitle(e.target.value)}
+                  placeholder="Purpose (e.g., Driving practice)..."
+                  className="domus-input text-xs"
+                />
+                <input
+                  value={bookNotes}
+                  onChange={(e) => setBookNotes(e.target.value)}
+                  placeholder="Notes (optional)..."
+                  className="domus-input text-xs"
+                />
 
                 <button
                   type="submit"
                   disabled={!selectedSlot}
-                  className="domus-btn-accent w-full py-2.5"
+                  className="domus-btn-accent w-full text-xs"
                 >
-                  Send Time-Booking Request
+                  Send Booking Request
                 </button>
               </form>
             )}
           </div>
 
-          {/* All Bookings Queue */}
           <div className="domus-card p-5">
             <h3 className="mb-3 text-sm font-bold text-stone-900">
-              Household Booking Queue
+              Booking Queue
             </h3>
             <div className="space-y-2.5">
-              {bookings.map((bk) => {
+              {bookings.slice(0, 5).map((bk) => {
                 const req = memberById.get(bk.requesterId);
                 const tgt = memberById.get(bk.targetMemberId);
                 const isPending =
                   bk.status === "PENDING" ||
                   bk.status === "AWAITING_HEAD_APPROVAL";
-
                 return (
-                  <motion.div
-                    key={bk.id}
-                    whileHover={{ y: -2 }}
-                    className="domus-tile p-3.5"
-                  >
+                  <div key={bk.id} className="domus-tile p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-xs font-bold text-stone-900">
@@ -836,32 +959,21 @@ export default function CalendarView({
                         </p>
                         <p className="text-[11px] text-stone-500">
                           {req?.name} → {tgt?.name} ·{" "}
-                          {formatShortDate(bk.startTime)}{" "}
-                          {formatTimeRange(bk.startTime, bk.endTime)}
+                          {formatShortDate(bk.startTime)}
                         </p>
                       </div>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          bk.status === "ACCEPTED"
-                            ? "bg-sage-100 text-sage-700"
-                            : bk.status === "DECLINED" ||
-                                bk.status === "CANCELLED"
-                              ? "bg-stone-200 text-stone-600"
-                              : "bg-amber-100 text-amber-800"
-                        }`}
-                      >
+                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-600">
                         {bk.status.replaceAll("_", " ")}
                       </span>
                     </div>
-
                     {isPending && (
-                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <div className="mt-2 flex flex-wrap gap-1.5">
                         {bk.status === "AWAITING_HEAD_APPROVAL" && canApprove && (
                           <button
                             onClick={() => handleBookingAction(bk.id, "APPROVE")}
                             className="domus-btn-accent px-2.5 py-1 text-[11px]"
                           >
-                            Approve (Head)
+                            Approve
                           </button>
                         )}
                         {bk.status === "PENDING" &&
@@ -873,7 +985,7 @@ export default function CalendarView({
                               }
                               className="domus-btn-primary px-2.5 py-1 text-[11px]"
                             >
-                              Accept &amp; Add to Calendar
+                              Accept
                             </button>
                           )}
                         {(bk.targetMemberId === currentMember.id ||
@@ -885,17 +997,9 @@ export default function CalendarView({
                             Decline
                           </button>
                         )}
-                        {bk.requesterId === currentMember.id && (
-                          <button
-                            onClick={() => handleBookingAction(bk.id, "CANCEL")}
-                            className="domus-btn-secondary px-2.5 py-1 text-[11px]"
-                          >
-                            Cancel
-                          </button>
-                        )}
                       </div>
                     )}
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>

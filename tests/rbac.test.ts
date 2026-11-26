@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   can,
   canEditOrDeleteEvent,
+  canEnterRoom,
   canViewTracker,
   MemberContext,
   redactEventForViewer,
@@ -97,5 +98,16 @@ describe("Domus RBAC engine", () => {
     expect(canEditOrDeleteEvent(memberEvent, coHead)).toBe(true);
     expect(canEditOrDeleteEvent(memberEvent, junior)).toBe(false);
     expect(canEditOrDeleteEvent(memberEvent, guest)).toBe(false);
+  });
+
+  it("enforces universal Knock-to-Visit privacy for every room (even Head of Household)", () => {
+    const knocks = [
+      { visitorId: "head", roomOwnerId: "member", status: "KNOCKING" },
+      { visitorId: "cohead", roomOwnerId: "member", status: "ALLOWED" },
+    ];
+    expect(canEnterRoom("member", "member", knocks)).toBe(true);
+    expect(canEnterRoom("head", "member", knocks)).toBe(false);
+    expect(canEnterRoom("cohead", "member", knocks)).toBe(true);
+    expect(canEnterRoom("junior", "member", knocks)).toBe(false);
   });
 });

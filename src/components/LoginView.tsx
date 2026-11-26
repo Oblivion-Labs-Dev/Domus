@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Crown, Home, Lock, Shield, Sparkles } from "lucide-react";
 import { ROLE_META } from "@/lib/rbac";
-import IsometricHomeScene from "./IsometricHomeScene";
 import TiltCard from "./TiltCard";
 import type { HouseholdDTO, MemberDTO } from "./types";
 
@@ -92,7 +91,7 @@ export default function LoginView({
                 Domus
               </h1>
               <p className="text-xs font-medium text-stone-500">
-                {household?.name ?? "Family Operating Hub"} · Oblivion Labs
+                {household?.name ?? "Digital Home"} · Oblivion Labs
               </p>
             </div>
           </div>
@@ -105,12 +104,12 @@ export default function LoginView({
             }}
           >
             <Shield className="h-3.5 w-3.5 text-terracotta-500" />
-            Real Family Roles &amp; Permissions
+            Private Rooms · Knock to Visit
           </span>
         </motion.div>
 
         <div className="grid items-start gap-8 lg:grid-cols-12">
-          {/* Left Column: Hero + 2.5D Isometric Scene + Role Switcher */}
+          {/* Left Column: Hero + Custom 2.5D Isometric House Diorama + Role Picker */}
           <div className="space-y-6 lg:col-span-7">
             <motion.div
               initial={{ opacity: 0, y: 14 }}
@@ -119,42 +118,77 @@ export default function LoginView({
               className="space-y-3"
             >
               <h2 className="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
-                One tactile space for overlapping plans, time-booking, health
-                &amp; home lists.
+                A real digital house — shared living room boards &amp; private
+                customizable rooms.
               </h2>
               <p className="max-w-xl text-sm leading-relaxed text-stone-600">
-                Lighter than Notion, built deeper than Google Calendar. Track
-                exercise, diet, driving lessons, and yoga alongside shared
-                shopping, meal prep, and lawn chores — governed by a real Head
-                of Family.
+                Pick up shared house chores, pin colorful sticky notes, reserve
+                House Gear like the family car or lawn mower, decorate your own
+                room with 2.5D objects, and knock on anyone&apos;s door before
+                visiting.
               </p>
             </motion.div>
 
-            {/* Interactive 2.5D Isometric Diorama */}
+            {/* Bespoke 2.5D Isometric House Showcase */}
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.12, type: "spring", stiffness: 220 }}
+              transition={{ delay: 0.1, type: "spring", stiffness: 220 }}
             >
-              <IsometricHomeScene />
+              <TiltCard maxTilt={5} lift={4} className="overflow-hidden p-4">
+                <div className="grid items-center gap-4 sm:grid-cols-12">
+                  <div className="sm:col-span-7">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/assets/house-hero.png"
+                      alt="Domus 2.5D Isometric Home"
+                      className="h-56 w-full rounded-2xl bg-[#faf9f5] object-cover shadow-inner"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5 sm:col-span-5">
+                    {[
+                      { src: "/assets/board-3d.png", label: "Common Boards" },
+                      { src: "/assets/door-3d.png", label: "Knock to Visit" },
+                      { src: "/assets/calendar-3d.png", label: "Day/Wk/Yr Cal" },
+                      { src: "/assets/decor-plant.png", label: "2.5D Decor" },
+                    ].map((tile) => (
+                      <motion.div
+                        key={tile.label}
+                        whileHover={{ y: -3, scale: 1.04 }}
+                        className="domus-tile flex flex-col items-center p-2 text-center"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={tile.src}
+                          alt={tile.label}
+                          className="h-14 w-14 rounded-xl bg-[#faf9f5] object-cover"
+                        />
+                        <span className="mt-1 text-[10px] font-bold text-stone-700">
+                          {tile.label}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </TiltCard>
             </motion.div>
 
             {demoSwitcherEnabled && demoMembers.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.18 }}
+                transition={{ delay: 0.16 }}
                 className="domus-card p-5"
               >
                 <div className="mb-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-terracotta-500" />
                     <h3 className="text-sm font-bold text-stone-900">
-                      Jump In as Any Family Role
+                      Walk Through the Front Door As...
                     </h3>
                   </div>
                   <span className="text-xs font-medium text-stone-400">
-                    Live RBAC preview
+                    Click any family member
                   </span>
                 </div>
 
@@ -164,7 +198,7 @@ export default function LoginView({
                       key={m.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 + idx * 0.05 }}
+                      transition={{ delay: 0.2 + idx * 0.04 }}
                       whileHover={{ y: -3, scale: 1.015 }}
                       whileTap={{ y: 1, scale: 0.985 }}
                       disabled={loading}
@@ -198,7 +232,7 @@ export default function LoginView({
                           </p>
                         </div>
                       </div>
-                      <ArrowRight className="h-4 w-4 text-stone-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-stone-900" />
+                      <ArrowRight className="h-4 w-4 shrink-0 text-stone-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-stone-900" />
                     </motion.button>
                   ))}
                 </div>
@@ -206,17 +240,17 @@ export default function LoginView({
             )}
           </div>
 
-          {/* Right Column: 2.5D Tilt Sign-In Card */}
+          {/* Right Column: Sign-In Card */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.16 }}
-            className="lg:col-span-5 lg:sticky lg:top-8"
+            transition={{ delay: 0.14 }}
+            className="lg:sticky lg:top-8 lg:col-span-5"
           >
             <TiltCard maxTilt={5} lift={4} className="p-6 sm:p-7">
               <div className="mb-6 flex items-center gap-3">
                 <div
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl bg-stone-100 text-stone-800"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-stone-800"
                   style={{
                     boxShadow:
                       "inset 0 1px 0 #fff, 0 3px 0 0 rgba(212,206,192,0.9)",

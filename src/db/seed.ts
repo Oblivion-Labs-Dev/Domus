@@ -1,17 +1,23 @@
 import { db, ensureTables } from "./index";
 import {
   auditLogs,
+  boardCards,
+  boardColumns,
+  boards,
   calendarEvents,
   householdLists,
   households,
+  houseResources,
   listItems,
   members,
+  roomConfigs,
+  roomKnocks,
   timeBookings,
   trackerLogs,
   trackers,
 } from "./schema";
 import { hashPassword } from "../lib/auth";
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 
 function dayAt(dayOffset: number, hour: number, minute = 0): string {
   const d = new Date();
@@ -26,15 +32,500 @@ function dateStr(dayOffset = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
+export async function seedV2IfMissing(householdId: string): Promise<void> {
+  const now = new Date().toISOString();
+
+  const existingResources = await db
+    .select({ value: count() })
+    .from(houseResources);
+
+  if ((existingResources[0]?.value ?? 0) === 0) {
+    await db.insert(houseResources).values([
+      {
+        id: "res_car",
+        householdId,
+        name: "Family Car (Honda CR-V)",
+        category: "VEHICLE",
+        iconAsset: "/assets/decor-car.png",
+        notes: "Shared SUV for driving lessons, errands & Costco runs",
+        createdAt: now,
+      },
+      {
+        id: "res_mower",
+        householdId,
+        name: "Lawn Mower & Trimmer",
+        category: "YARD",
+        iconAsset: "/assets/decor-mower.png",
+        notes: "Garage shed — check gas level before starting",
+        createdAt: now,
+      },
+      {
+        id: "res_yoga",
+        householdId,
+        name: "Home Gym & Yoga Corner",
+        category: "WELLNESS",
+        iconAsset: "/assets/decor-yoga.png",
+        notes: "Mats, kettlebells & bench in living/garage studio",
+        createdAt: now,
+      },
+      {
+        id: "res_kitchen",
+        householdId,
+        name: "Main Kitchen & Oven",
+        category: "KITCHEN",
+        iconAsset: "/assets/decor-groceries.png",
+        notes: "Batch meal prep & baking blocks",
+        createdAt: now,
+      },
+    ]);
+
+    // Link existing seeded events to House Gear if present
+    await db
+      .update(calendarEvents)
+      .set({ resourceId: "res_car" })
+      .where(eq(calendarEvents.id, "evt_driving_lesson"));
+    await db
+      .update(calendarEvents)
+      .set({ resourceId: "res_mower" })
+      .where(eq(calendarEvents.id, "evt_lawn_mowing"));
+    await db
+      .update(calendarEvents)
+      .set({ resourceId: "res_yoga" })
+      .where(eq(calendarEvents.id, "evt_morning_yoga"));
+  }
+
+  const existingBoards = await db.select({ value: count() }).from(boards);
+  if ((existingBoards[0]?.value ?? 0) === 0) {
+    // 1. Common House Board
+    await db.insert(boards).values([
+      {
+        id: "brd_common",
+        householdId,
+        scope: "COMMON",
+        ownerId: null,
+        title: "Living Room House Board",
+        description:
+          "Shared chores, shopping runs, meal prep & family notes — pick up any task or drag it across columns.",
+        createdAt: now,
+      },
+      {
+        id: "brd_head",
+        householdId,
+        scope: "PERSONAL",
+        ownerId: "mem_head",
+        title: "Aarav's Desk Board",
+        description: "Personal workouts, house maintenance & focus notes",
+        createdAt: now,
+      },
+      {
+        id: "brd_cohead",
+        householdId,
+        scope: "PERSONAL",
+        ownerId: "mem_cohead",
+        title: "Meera's Studio Board",
+        description: "Yoga flow, meal planning & personal routines",
+        createdAt: now,
+      },
+      {
+        id: "brd_member",
+        householdId,
+        scope: "PERSONAL",
+        ownerId: "mem_member",
+        title: "Rohan's Room Board",
+        description: "Driving test prep, strength training & personal projects",
+        createdAt: now,
+      },
+      {
+        id: "brd_junior",
+        householdId,
+        scope: "PERSONAL",
+        ownerId: "mem_junior",
+        title: "Ananya's Space Board",
+        description: "Swim practice, school work & room chores",
+        createdAt: now,
+      },
+      {
+        id: "brd_guest",
+        householdId,
+        scope: "PERSONAL",
+        ownerId: "mem_guest",
+        title: "Priya Auntie's Corner",
+        description: "Visiting notes & favorite family recipes",
+        createdAt: now,
+      },
+    ]);
+
+    await db.insert(boardColumns).values([
+      // Common board columns
+      {
+        id: "col_common_open",
+        boardId: "brd_common",
+        householdId,
+        title: "Open / Unclaimed",
+        color: "#d4633e",
+        position: 0,
+      },
+      {
+        id: "col_common_picked",
+        boardId: "brd_common",
+        householdId,
+        title: "Picked Up",
+        color: "#3b6fa0",
+        position: 1,
+      },
+      {
+        id: "col_common_progress",
+        boardId: "brd_common",
+        householdId,
+        title: "In Progress",
+        color: "#c08552",
+        position: 2,
+      },
+      {
+        id: "col_common_done",
+        boardId: "brd_common",
+        householdId,
+        title: "Done",
+        color: "#4f7c5b",
+        position: 3,
+      },
+      // Personal columns for each member
+      { id: "col_head_1", boardId: "brd_head", householdId, title: "Focus Today", color: "#d4633e", position: 0 },
+      { id: "col_head_2", boardId: "brd_head", householdId, title: "This Week", color: "#4f7c5b", position: 1 },
+      { id: "col_head_3", boardId: "brd_head", householdId, title: "Done", color: "#787164", position: 2 },
+
+      { id: "col_cohead_1", boardId: "brd_cohead", householdId, title: "My Priorities", color: "#4f7c5b", position: 0 },
+      { id: "col_cohead_2", boardId: "brd_cohead", householdId, title: "Meal & Yoga Ideas", color: "#d4633e", position: 1 },
+      { id: "col_cohead_3", boardId: "brd_cohead", householdId, title: "Completed", color: "#787164", position: 2 },
+
+      { id: "col_member_1", boardId: "brd_member", householdId, title: "Up Next", color: "#3b6fa0", position: 0 },
+      { id: "col_member_2", boardId: "brd_member", householdId, title: "Driving & Gym", color: "#d4633e", position: 1 },
+      { id: "col_member_3", boardId: "brd_member", householdId, title: "Done", color: "#4f7c5b", position: 2 },
+
+      { id: "col_junior_1", boardId: "brd_junior", householdId, title: "To Do", color: "#9b5de5", position: 0 },
+      { id: "col_junior_2", boardId: "brd_junior", householdId, title: "Done", color: "#4f7c5b", position: 1 },
+
+      { id: "col_guest_1", boardId: "brd_guest", householdId, title: "Notes", color: "#c08552", position: 0 },
+    ]);
+
+    await db.insert(boardCards).values([
+      {
+        id: "crd_lawn",
+        boardId: "brd_common",
+        columnId: "col_common_open",
+        householdId,
+        title: "Mow Front & Back Lawn + Edge Walkway",
+        description:
+          "Pick this up to claim it! Reserves the Lawn Mower automatically once scheduled.",
+        cardType: "TASK",
+        noteColor: "sage",
+        tagsJson: JSON.stringify(["lawn", "yard", "weekend"]),
+        priority: "HIGH",
+        assigneeId: null,
+        resourceId: "res_mower",
+        dueDate: dateStr(2),
+        startTime: dayAt(2, 9, 0),
+        endTime: dayAt(2, 10, 30),
+        syncToCommonCalendar: true,
+        linkedEventId: "evt_lawn_mowing",
+        position: 0,
+        createdById: "mem_head",
+        createdAt: now,
+      },
+      {
+        id: "crd_costco",
+        boardId: "brd_common",
+        columnId: "col_common_open",
+        householdId,
+        title: "Costco & Trader Joe's Weekly Run",
+        description:
+          "Organic spinach, Greek yogurt, avocados, berries, paneer & trimmer line.",
+        cardType: "TASK",
+        noteColor: "butter",
+        tagsJson: JSON.stringify(["shopping", "groceries"]),
+        priority: "MEDIUM",
+        assigneeId: null,
+        resourceId: "res_car",
+        dueDate: dateStr(1),
+        startTime: dayAt(1, 10, 0),
+        endTime: dayAt(1, 11, 30),
+        syncToCommonCalendar: true,
+        linkedEventId: "evt_grocery_run",
+        position: 1,
+        createdById: "mem_cohead",
+        createdAt: now,
+      },
+      {
+        id: "crd_mealprep",
+        boardId: "brd_common",
+        columnId: "col_common_picked",
+        householdId,
+        title: "Sunday High-Protein Meal Prep",
+        description:
+          "Marinate paneer & tofu bowls, chop veggies, prep 8 overnight oats jars.",
+        cardType: "TASK",
+        noteColor: "terracotta",
+        tagsJson: JSON.stringify(["diet", "meal-prep"]),
+        priority: "HIGH",
+        assigneeId: "mem_cohead",
+        resourceId: "res_kitchen",
+        dueDate: dateStr(1),
+        startTime: dayAt(1, 15, 0),
+        endTime: dayAt(1, 16, 30),
+        syncToCommonCalendar: true,
+        position: 0,
+        createdById: "mem_cohead",
+        createdAt: now,
+      },
+      {
+        id: "crd_driving_common",
+        boardId: "brd_common",
+        columnId: "col_common_progress",
+        householdId,
+        title: "Rohan Driving Lesson — Highway Merge",
+        description:
+          "45-min loop with Dad in the CR-V. Focus on blind-spot checks & parallel parking.",
+        cardType: "TASK",
+        noteColor: "sky",
+        tagsJson: JSON.stringify(["driving", "milestone"]),
+        priority: "HIGH",
+        assigneeId: "mem_member",
+        resourceId: "res_car",
+        dueDate: dateStr(0),
+        startTime: dayAt(0, 16, 0),
+        endTime: dayAt(0, 17, 15),
+        syncToCommonCalendar: true,
+        linkedEventId: "evt_driving_lesson",
+        position: 0,
+        createdById: "mem_member",
+        createdAt: now,
+      },
+      {
+        id: "crd_note_welcome",
+        boardId: "brd_common",
+        columnId: "col_common_done",
+        householdId,
+        title: "House Note: Fresh Avocados on Counter!",
+        description:
+          "Priya Auntie picked up ripe avocados & bananas — great for post-yoga smoothies.",
+        cardType: "NOTE",
+        noteColor: "butter",
+        tagsJson: JSON.stringify(["note", "kitchen"]),
+        priority: "LOW",
+        assigneeId: "mem_guest",
+        resourceId: null,
+        dueDate: "",
+        syncToCommonCalendar: false,
+        position: 0,
+        createdById: "mem_guest",
+        createdAt: now,
+      },
+      // Personal room starter cards
+      {
+        id: "crd_p_head_1",
+        boardId: "brd_head",
+        columnId: "col_head_1",
+        householdId,
+        title: "Zone-2 45-min Morning Run",
+        description: "Keep heart rate under 142 bpm along the creek trail.",
+        cardType: "TASK",
+        noteColor: "terracotta",
+        tagsJson: JSON.stringify(["exercise", "cardio"]),
+        priority: "HIGH",
+        assigneeId: "mem_head",
+        dueDate: dateStr(0),
+        syncToCommonCalendar: false,
+        position: 0,
+        createdById: "mem_head",
+        createdAt: now,
+      },
+      {
+        id: "crd_p_head_2",
+        boardId: "brd_head",
+        columnId: "col_head_2",
+        householdId,
+        title: "Check Lawn Mower Spark Plug & Oil",
+        description: "Quick 10-min tune-up before weekend mowing.",
+        cardType: "NOTE",
+        noteColor: "butter",
+        tagsJson: JSON.stringify(["garage", "home"]),
+        priority: "MEDIUM",
+        assigneeId: "mem_head",
+        dueDate: dateStr(1),
+        syncToCommonCalendar: false,
+        position: 0,
+        createdById: "mem_head",
+        createdAt: now,
+      },
+      {
+        id: "crd_p_member_1",
+        boardId: "brd_member",
+        columnId: "col_member_2",
+        householdId,
+        title: "DMV Road Test Practice Checklist",
+        description:
+          "3-point turns, hill parking, highway merge — 11.5 hours left to reach 30h goal!",
+        cardType: "NOTE",
+        noteColor: "sky",
+        tagsJson: JSON.stringify(["driving", "dmv"]),
+        priority: "HIGH",
+        assigneeId: "mem_member",
+        dueDate: dateStr(3),
+        syncToCommonCalendar: false,
+        position: 0,
+        createdById: "mem_member",
+        createdAt: now,
+      },
+      {
+        id: "crd_p_cohead_1",
+        boardId: "brd_cohead",
+        columnId: "col_cohead_1",
+        householdId,
+        title: "Morning Vinyasa + Breathwork",
+        description: "45 mins on the living room mat before breakfast.",
+        cardType: "TASK",
+        noteColor: "sage",
+        tagsJson: JSON.stringify(["yoga", "morning"]),
+        priority: "HIGH",
+        assigneeId: "mem_cohead",
+        dueDate: dateStr(0),
+        syncToCommonCalendar: false,
+        position: 0,
+        createdById: "mem_cohead",
+        createdAt: now,
+      },
+    ]);
+  }
+
+  const existingRooms = await db.select({ value: count() }).from(roomConfigs);
+  if ((existingRooms[0]?.value ?? 0) === 0) {
+    await db.insert(roomConfigs).values([
+      {
+        id: "rc_common",
+        householdId,
+        ownerKey: "COMMON",
+        roomTitle: "The Common Living Room",
+        theme: "stone",
+        bannerQuote:
+          "Pick up a house task, pin a note, or check what gear is free.",
+        layoutJson: JSON.stringify(["board", "gear", "lists"]),
+        decorItemsJson: JSON.stringify([
+          { uid: "d_c1", assetId: "decor-plant", label: "Living Room Monstera" },
+          { uid: "d_c2", assetId: "decor-groceries", label: "Sunday Market" },
+          { uid: "d_c3", assetId: "decor-lamp", label: "Warm Corner" },
+        ]),
+        updatedAt: now,
+      },
+      {
+        id: "rc_head",
+        householdId,
+        ownerKey: "mem_head",
+        roomTitle: "Aarav's Study",
+        theme: "terracotta",
+        bannerQuote: "Steady rhythms, strong home.",
+        layoutJson: JSON.stringify(["board", "trackers"]),
+        decorItemsJson: JSON.stringify([
+          { uid: "d_h1", assetId: "decor-lamp", label: "Desk Lamp" },
+          { uid: "d_h2", assetId: "decor-mower", label: "Yard Gear" },
+        ]),
+        updatedAt: now,
+      },
+      {
+        id: "rc_cohead",
+        householdId,
+        ownerKey: "mem_cohead",
+        roomTitle: "Meera's Sunlit Studio",
+        theme: "sage",
+        bannerQuote: "Breathe, nourish, and keep the week light.",
+        layoutJson: JSON.stringify(["board", "trackers"]),
+        decorItemsJson: JSON.stringify([
+          { uid: "d_m1", assetId: "decor-plant", label: "Monstera" },
+          { uid: "d_m2", assetId: "decor-yoga", label: "Daily Yoga" },
+        ]),
+        updatedAt: now,
+      },
+      {
+        id: "rc_member",
+        householdId,
+        ownerKey: "mem_member",
+        roomTitle: "Rohan's Loft",
+        theme: "midnight",
+        bannerQuote: "30 driving hours & clean lifts.",
+        layoutJson: JSON.stringify(["board", "trackers"]),
+        decorItemsJson: JSON.stringify([
+          { uid: "d_r1", assetId: "decor-car", label: "Road Test Goal" },
+          { uid: "d_r2", assetId: "decor-yoga", label: "Gym Gear" },
+        ]),
+        updatedAt: now,
+      },
+      {
+        id: "rc_junior",
+        householdId,
+        ownerKey: "mem_junior",
+        roomTitle: "Ananya's Corner",
+        theme: "butter",
+        bannerQuote: "Swim fast, stay hydrated!",
+        layoutJson: JSON.stringify(["board", "trackers"]),
+        decorItemsJson: JSON.stringify([
+          { uid: "d_j1", assetId: "decor-plant", label: "Desk Plant" },
+          { uid: "d_j2", assetId: "calendar-3d", label: "Swim Schedule" },
+        ]),
+        updatedAt: now,
+      },
+      {
+        id: "rc_guest",
+        householdId,
+        ownerKey: "mem_guest",
+        roomTitle: "Priya Auntie's Guest Room",
+        theme: "stone",
+        bannerQuote: "Happy to help around the house!",
+        layoutJson: JSON.stringify(["board"]),
+        decorItemsJson: JSON.stringify([
+          { uid: "d_g1", assetId: "decor-groceries", label: "Recipe Notes" },
+        ]),
+        updatedAt: now,
+      },
+    ]);
+  }
+
+  const existingKnocks = await db.select({ value: count() }).from(roomKnocks);
+  if ((existingKnocks[0]?.value ?? 0) === 0) {
+    await db.insert(roomKnocks).values([
+      {
+        id: "knk_1",
+        householdId,
+        visitorId: "mem_cohead",
+        roomOwnerId: "mem_head",
+        message:
+          "Hey Aarav! Mind if I peek at your yard checklist before Saturday?",
+        status: "KNOCKING",
+        createdAt: now,
+      },
+      {
+        id: "knk_2",
+        householdId,
+        visitorId: "mem_head",
+        roomOwnerId: "mem_member",
+        message:
+          "Knocking! Wanted to see your driving lesson checklist before our 4 PM practice.",
+        status: "KNOCKING",
+        createdAt: now,
+      },
+    ]);
+  }
+}
+
 export async function seedIfEmpty(): Promise<boolean> {
   await ensureTables();
   const existing = await db.select({ value: count() }).from(households);
+  const householdId = "hh_suryawanshi";
+
   if ((existing[0]?.value ?? 0) > 0) {
+    await seedV2IfMissing(householdId);
     return false;
   }
 
   const now = new Date().toISOString();
-  const householdId = "hh_suryawanshi";
   const defaultPass = hashPassword("domus123");
 
   await db.insert(households).values({
@@ -454,22 +945,6 @@ export async function seedIfEmpty(): Promise<boolean> {
       createdAt: now,
     },
     {
-      id: "item_4",
-      listId: "list_shopping",
-      householdId,
-      title: "Avocados & Bananas",
-      category: "Produce",
-      quantity: "6 each",
-      assigneeId: "mem_guest",
-      dueDate: dateStr(0),
-      priority: "LOW",
-      isCompleted: true,
-      completedById: "mem_guest",
-      completedAt: now,
-      createdById: "mem_cohead",
-      createdAt: now,
-    },
-    {
       id: "item_5",
       listId: "list_mealprep",
       householdId,
@@ -479,20 +954,6 @@ export async function seedIfEmpty(): Promise<boolean> {
       assigneeId: "mem_cohead",
       dueDate: dateStr(1),
       priority: "HIGH",
-      isCompleted: false,
-      createdById: "mem_cohead",
-      createdAt: now,
-    },
-    {
-      id: "item_6",
-      listId: "list_mealprep",
-      householdId,
-      title: "Wash & portion berries + overnight oats jars",
-      category: "Breakfast",
-      quantity: "8 jars",
-      assigneeId: "mem_member",
-      dueDate: dateStr(1),
-      priority: "MEDIUM",
       isCompleted: false,
       createdById: "mem_cohead",
       createdAt: now,
@@ -511,36 +972,6 @@ export async function seedIfEmpty(): Promise<boolean> {
       createdById: "mem_head",
       createdAt: now,
     },
-    {
-      id: "item_8",
-      listId: "list_chores",
-      householdId,
-      title: "Unload dishwasher & wipe kitchen island",
-      category: "Kitchen",
-      quantity: "15 mins",
-      assigneeId: "mem_junior",
-      dueDate: dateStr(0),
-      priority: "HIGH",
-      isCompleted: false,
-      createdById: "mem_cohead",
-      createdAt: now,
-    },
-    {
-      id: "item_9",
-      listId: "list_chores",
-      householdId,
-      title: "Roll recycling & compost bins to curb",
-      category: "Outdoor",
-      quantity: "5 mins",
-      assigneeId: "mem_member",
-      dueDate: dateStr(0),
-      priority: "MEDIUM",
-      isCompleted: true,
-      completedById: "mem_member",
-      completedAt: now,
-      createdById: "mem_head",
-      createdAt: now,
-    },
   ]);
 
   await db.insert(auditLogs).values([
@@ -550,20 +981,12 @@ export async function seedIfEmpty(): Promise<boolean> {
       actorId: "mem_head",
       action: "HOUSEHOLD_CREATED",
       targetType: "HOUSEHOLD",
-      summary: "Initialized The Domus Residence with 5 family roles & RBAC policies.",
-      createdAt: now,
-    },
-    {
-      id: "aud_2",
-      householdId,
-      actorId: "mem_head",
-      action: "ROLE_ASSIGNED",
-      targetType: "MEMBER",
-      summary: "Set Meera as Co-Head with booking approval & list management authority.",
+      summary: "Initialized The Domus Residence with 5 family roles & universal room privacy.",
       createdAt: now,
     },
   ]);
 
+  await seedV2IfMissing(householdId);
   return true;
 }
 
@@ -577,7 +1000,7 @@ if (isDirectExecution) {
       console.log(
         seeded
           ? "✓ Seeded Domus household database (./data/domus.db)"
-          : "• Database already seeded — skipped."
+          : "✓ Verified & upgraded Domus v2 tables (./data/domus.db)"
       );
       process.exit(0);
     })

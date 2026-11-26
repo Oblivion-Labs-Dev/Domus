@@ -1,4 +1,5 @@
 import type { PermissionOverrides, Role } from "@/lib/rbac";
+import type { NoteColorId, PlacedDecor, RoomThemeId } from "@/lib/decor";
 
 export interface HouseholdDTO {
   id: string;
@@ -20,12 +21,28 @@ export interface MemberDTO {
   createdAt?: string;
 }
 
+export interface HouseResourceDTO {
+  id: string;
+  name: string;
+  category: string;
+  iconAsset: string;
+  notes: string | null;
+  status: "AVAILABLE" | "IN_USE";
+  currentEventTitle: string | null;
+  nextBooking: {
+    title: string;
+    startTime: string;
+    endTime: string;
+  } | null;
+}
+
 export interface CalendarEventDTO {
   id: string;
   title: string;
   category: string;
   ownerId: string;
   participantIds: string[];
+  resourceId: string | null;
   startTime: string;
   endTime: string;
   visibility: string;
@@ -41,6 +58,7 @@ export interface TimeBookingDTO {
   id: string;
   requesterId: string;
   targetMemberId: string;
+  resourceId?: string | null;
   title: string;
   category: string;
   notes: string | null;
@@ -50,6 +68,63 @@ export interface TimeBookingDTO {
   approvedById: string | null;
   createdEventId: string | null;
   createdAt: string;
+}
+
+export interface BoardDTO {
+  id: string;
+  scope: "COMMON" | "PERSONAL";
+  ownerId: string | null;
+  title: string;
+  description: string | null;
+}
+
+export interface BoardColumnDTO {
+  id: string;
+  boardId: string;
+  title: string;
+  color: string;
+  position: number;
+}
+
+export interface BoardCardDTO {
+  id: string;
+  boardId: string;
+  columnId: string;
+  title: string;
+  description: string | null;
+  cardType: "TASK" | "NOTE";
+  noteColor: NoteColorId;
+  tags: string[];
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  assigneeId: string | null;
+  resourceId: string | null;
+  dueDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  syncToCommonCalendar: boolean;
+  linkedEventId: string | null;
+  position: number;
+  createdById: string;
+}
+
+export interface RoomConfigDTO {
+  id: string;
+  ownerKey: string;
+  roomTitle: string;
+  theme: RoomThemeId;
+  bannerQuote: string;
+  layout: string[];
+  decorItems: PlacedDecor[];
+}
+
+export interface RoomKnockDTO {
+  id: string;
+  visitorId: string;
+  roomOwnerId: string;
+  message: string;
+  status: "KNOCKING" | "ALLOWED" | "DECLINED" | "REVOKED";
+  createdAt: string;
+  respondedAt: string | null;
 }
 
 export interface TrackerDTO {
@@ -108,12 +183,7 @@ export interface AuditLogDTO {
   createdAt: string;
 }
 
-export type ActiveTab =
-  | "dashboard"
-  | "calendar"
-  | "trackers"
-  | "lists"
-  | "family";
+export type ActiveTab = "common" | "room" | "calendar" | "family";
 
 export function formatTimeRange(startIso: string, endIso: string): string {
   const start = new Date(startIso);

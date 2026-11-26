@@ -3,6 +3,7 @@ export interface ScheduleBlock {
   title: string;
   ownerId: string;
   participantIds: string[];
+  resourceId?: string | null;
   startTime: string;
   endTime: string;
   isShared: boolean;
@@ -20,6 +21,7 @@ export interface ConflictDetail {
   title: string;
   startTime: string;
   endTime: string;
+  reason: "MEMBER" | "RESOURCE";
 }
 
 export function intervalsOverlap(
@@ -57,15 +59,41 @@ export function findConflictsForMember(
       title: block.isRedacted ? "Busy (Private Block)" : block.title,
       startTime: block.startTime,
       endTime: block.endTime,
+      reason: "MEMBER",
     }));
 }
 
 /**
- * Finds open booking slots for a given family member on a YYYY-MM-DD date.
+ * Checks if a shared House Gear resource (e.g., Family Car, Lawn Mower)
+ * is already booked during the requested time window.
  */
+export function findConflictsForResource(
+  blocks: ScheduleBlock[],
+  resourceId: string | null | undefined,
+  startTime: string,
+  endTime: string,
+  excludeEventId?: string
+): ConflictDetail[] {
+  if (!resourceId) return [];
+  return blocks
+    .filter((block) => {
+      if (excludeEventId && block.id === excludeEventId) return false;
+      if (block.resourceId !== resourceId) return false;
+      return intervalsOverlap(block.startTime, block.endTime, startTime, endTime);
+    })
+    .map((block) => ({
+      eventId: block.id,
+      title: block.isRedacted ? "Reserved Gear" : block.title,
+      startTime: block.startTime,
+      endTime: block.endTime,
+      reason: "RESOURCE",
+    }));
+}
+
 export function findAvailableSlots(params: {
   blocks: ScheduleBlock[];
   targetMemberId: string;
+  resourceId?: string | null;
   dateStr: string; // YYYY-MM-DD
   durationMinutes?: number;
   dayStartHour?: number;
@@ -74,6 +102,7 @@ export function findAvailableSlots(params: {
   const {
     blocks,
     targetMemberId,
+    resourceId,
     dateStr,
     durationMinutes = 60,
     dayStartHour = 7,
@@ -103,14 +132,20 @@ export function findAvailableSlots(params: {
     const startIso = startDate.toISOString();
     const endIso = endDate.toISOString();
 
-    const conflicts = findConflictsForMember(
+    const memberConflicts = findConflictsForMember(
       blocks,
       targetMemberId,
       startIso,
       endIso
     );
+    const resourceConflicts = findConflictsForResource(
+      blocks,
+      resourceId,
+      startIso,
+      endIso
+    );
 
-    if (conflicts.length === 0) {
+    if (memberConflicts.length === 0 && resourceConflicts.length === 0) {
       const fmt = (h: number, m: number) => {
         const suffix = h >= 12 ? "PM" : "AM";
         const h12 = h % 12 === 0 ? 12 : h % 12;
@@ -127,10 +162,6 @@ export function findAvailableSlots(params: {
   return slots;
 }
 
-/**
- * Classifies events into overlapping household moments vs. individual plans
- * and detects schedule collisions for any shared participant.
- */
 export function annotateScheduleOverlaps<T extends ScheduleBlock>(
   events: T[]
 ): Array<T & { hasCollision: boolean; isFamilyOverlap: boolean }> {
@@ -156,7 +187,15 @@ export function annotateScheduleOverlaps<T extends ScheduleBlock>(
         other.ownerId,
         ...other.participantIds,
       ]);
-      return participants.some((pid) => otherParticipants.has(pid));
+      const sharedPerson = participants.some((pid) =>
+        otherParticipants.has(pid)
+      );
+      const sharedGear = Boolean(
+        event.resourceId &&
+          other.resourceId &&
+          event.resourceId === other.resourceId
+      );
+      return sharedPerson || sharedGear;
     });
 
     return {
