@@ -490,21 +490,99 @@ export default function CommonAreaView({
   ).length;
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* SECTION 1: FAMILY HALLWAY — DOORS FOR EVERY MEMBER */}
-      <section className="domus-card p-6 sm:p-7">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
-              {household?.name ?? "Your Residence"} · Hallway
-            </p>
-            <h2 className="mt-0.5 text-xl font-extrabold tracking-tight text-[#1e1916]">
-              Family Doors
-            </h2>
-            <p className="text-xs text-[#6b5d53]">
-              Step directly into your own room, or knock on a family
-              member&apos;s door to visit.
-            </p>
+    <div className="space-y-4 pb-6">
+      {/* TOP COMPACT HALLWAY STRIP: FAMILY DOORS */}
+      <section className="domus-card px-4 py-3.5 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="mr-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-terracotta-600">
+                Hallway
+              </p>
+              <h2 className="text-sm font-extrabold tracking-tight text-[#1e1916]">
+                Family Doors
+              </h2>
+            </div>
+
+            {members.map((m) => {
+              const isMe = m.id === currentMember.id;
+              const isPublic = publicRoomOwners.has(m.id);
+              const myKnock = outgoingKnocks.find(
+                (k) => k.roomOwnerId === m.id
+              );
+              const canEnterDirectly =
+                isMe || isPublic || myKnock?.status === "ALLOWED";
+
+              return (
+                <motion.button
+                  key={m.id}
+                  type="button"
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    if (canEnterDirectly) {
+                      onEnterRoom(m.id);
+                    } else {
+                      setKnockTarget(m);
+                      setKnockMessage("");
+                    }
+                  }}
+                  className="domus-tile group flex items-center gap-2.5 px-3 py-2 text-left"
+                >
+                  <div className="relative flex shrink-0 items-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/assets/door-3d.png"
+                      alt={`${m.name}'s door`}
+                      className="h-9 w-9 object-contain mix-blend-multiply transition-transform group-hover:scale-105"
+                    />
+                    <div className="absolute -bottom-0.5 -right-1 rounded-full ring-2 ring-[#faf7f2]">
+                      <MemberAvatar
+                        initials={m.avatarInitials}
+                        color={m.color}
+                        avatarId={m.avatarId}
+                        size="sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 pr-1">
+                    <p className="text-xs font-extrabold leading-tight text-[#1e1916]">
+                      {m.name}
+                    </p>
+                    <span
+                      className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                        isMe
+                          ? "bg-[#1f332b] text-white"
+                          : canEnterDirectly
+                          ? "bg-sage-100 text-sage-800"
+                          : myKnock?.status === "KNOCKING"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-[#e7dfd4] text-[#5c5047]"
+                      }`}
+                    >
+                      {isMe ? (
+                        pendingIncomingCount > 0 ? (
+                          `${pendingIncomingCount} Knocking`
+                        ) : (
+                          "My Room"
+                        )
+                      ) : canEnterDirectly ? (
+                        <>
+                          <DoorOpen className="h-2.5 w-2.5" /> Open
+                        </>
+                      ) : myKnock?.status === "KNOCKING" ? (
+                        "Knocking..."
+                      ) : (
+                        <>
+                          <DoorClosed className="h-2.5 w-2.5" /> Knock
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </motion.button>
+              );
+            })}
           </div>
 
           {canInvite && (
@@ -515,181 +593,92 @@ export default function CommonAreaView({
                 setMemberError(null);
                 setAddMemberOpen(true);
               }}
-              className="domus-btn-secondary text-xs"
+              className="domus-btn-secondary shrink-0 py-2 text-xs"
             >
               <UserPlus className="h-3.5 w-3.5 text-sage-700" />
-              Add Family Member
+              Add Member
             </button>
           )}
         </div>
+      </section>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {members.map((m) => {
-            const isMe = m.id === currentMember.id;
-            const isPublic = publicRoomOwners.has(m.id);
-            const myKnock = outgoingKnocks.find((k) => k.roomOwnerId === m.id);
-            const canEnterDirectly =
-              isMe || isPublic || myKnock?.status === "ALLOWED";
+      {/* MAIN SIDE-BY-SIDE BENTO WORKSPACE: SHARED LISTS (LEFT) + FAMILY CALENDAR (RIGHT) */}
+      <div className="grid items-start gap-5 lg:grid-cols-12">
+        {/* LEFT 7 COLS: UNRESTRICTED SHARED FAMILY LISTS */}
+        <section className="space-y-4 lg:col-span-7">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-[#1e1916]">
+                <ListChecks className="h-4 w-4 text-terracotta-500" />
+                Shared Family Lists
+              </h2>
+              <p className="text-[11px] text-[#6b5d53]">
+                Drag items between lists, check them off, or add a date to sync
+                to the calendar.
+              </p>
+            </div>
 
-            return (
-              <motion.button
-                key={m.id}
-                type="button"
-                whileHover={{ y: -4 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  if (canEnterDirectly) {
-                    onEnterRoom(m.id);
-                  } else {
-                    setKnockTarget(m);
-                    setKnockMessage("");
-                  }
-                }}
-                className="domus-tile group relative flex flex-col items-center p-4 text-center"
+            <button
+              type="button"
+              onClick={() => setNewListOpen((v) => !v)}
+              className="domus-btn-accent py-2 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New List
+            </button>
+          </div>
+
+          {/* Inline New List Creator */}
+          <AnimatePresence>
+            {newListOpen && (
+              <motion.form
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                onSubmit={handleCreateList}
+                className="domus-card space-y-3.5 p-4 sm:p-5"
               >
-                {/* Status badge */}
-                <span
-                  className={`absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                    isMe
-                      ? "bg-[#1f332b] text-white"
-                      : canEnterDirectly
-                      ? "bg-sage-100 text-sage-800"
-                      : myKnock?.status === "KNOCKING"
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-[#e7dfd4] text-[#5c5047]"
-                  }`}
-                >
-                  {isMe ? (
-                    pendingIncomingCount > 0 ? (
-                      `${pendingIncomingCount} Knocking`
-                    ) : (
-                      "Your Room"
-                    )
-                  ) : canEnterDirectly ? (
-                    <>
-                      <DoorOpen className="h-3 w-3" /> Open
-                    </>
-                  ) : myKnock?.status === "KNOCKING" ? (
-                    "Knocking..."
-                  ) : (
-                    <>
-                      <DoorClosed className="h-3 w-3" /> Knock
-                    </>
-                  )}
-                </span>
-
-                {/* 2.5D Door Illustration + Member Avatar */}
-                <div className="relative mt-4 mb-2.5 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/assets/door-3d.png"
-                    alt={`${m.name}'s door`}
-                    className="h-20 w-20 rounded-2xl object-contain mix-blend-multiply transition-transform duration-200 group-hover:scale-105"
-                  />
-                  <div className="absolute -bottom-1 -right-1 rounded-full ring-2 ring-[#faf7f2]">
-                    <MemberAvatar
-                      initials={m.avatarInitials}
-                      color={m.color}
-                      avatarId={m.avatarId}
-                      size="sm"
+                <div className="flex flex-wrap items-end gap-2.5">
+                  <div className="min-w-[200px] flex-1">
+                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                      List Name <span className="text-terracotta-500">*</span>
+                    </label>
+                    <input
+                      autoFocus
+                      required
+                      value={newListTitle}
+                      onChange={(e) => setNewListTitle(e.target.value)}
+                      placeholder="e.g., Groceries, Meal Prep, Relative Birthdays..."
+                      className="domus-input py-2 text-xs"
                     />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewListOpen(false);
+                        setNewListTitle("");
+                      }}
+                      className="domus-btn-secondary py-2 text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="domus-btn-accent py-2 text-xs"
+                    >
+                      Create
+                    </button>
                   </div>
                 </div>
 
-                <p className="text-sm font-bold text-[#1e1916]">{m.name}</p>
-                <p className="text-[11px] font-medium text-[#6b5d53]">
-                  {isMe
-                    ? "Enter directly"
-                    : canEnterDirectly
-                    ? "Step inside"
-                    : "Click to knock"}
-                </p>
-              </motion.button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* SECTION 2: UNRESTRICTED SHARED FAMILY LISTS (DRAG & DROP + CHECK/STRIKETHROUGH) */}
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-[#1e1916]">
-              <ListChecks className="h-5 w-5 text-terracotta-500" />
-              Shared Family Lists
-            </h2>
-            <p className="text-xs text-[#6b5d53]">
-              Create any list for the whole home — groceries, meal prep,
-              errands, birthdays. Drag items between lists and check them off
-              when done.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setNewListOpen((v) => !v)}
-            className="domus-btn-accent text-xs"
-          >
-            <Plus className="h-4 w-4" />
-            New Shared List
-          </button>
-        </div>
-
-        {/* Inline New List Creator */}
-        <AnimatePresence>
-          {newListOpen && (
-            <motion.form
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              onSubmit={handleCreateList}
-              className="domus-card space-y-4 p-5 sm:p-6"
-            >
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-[220px] flex-1">
-                  <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                    List Name <span className="text-terracotta-500">*</span>
-                  </label>
-                  <input
-                    autoFocus
-                    required
-                    value={newListTitle}
-                    onChange={(e) => setNewListTitle(e.target.value)}
-                    placeholder="e.g., Weekly Groceries, Meal Prep, Relative Birthdays..."
-                    className="domus-input"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewListOpen(false);
-                      setNewListTitle("");
-                    }}
-                    className="domus-btn-secondary py-2.5 text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="domus-btn-accent py-2.5 text-xs"
-                  >
-                    Create List
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-[11px] font-bold text-[#6b5d53]">
-                  Pick an Icon (Optional)
-                </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {LIST_ICON_OPTIONS.map((opt) => (
                     <button
                       key={opt.id}
                       type="button"
                       onClick={() => setNewListIcon(opt.src)}
-                      className={`flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+                      className={`flex items-center gap-1 rounded-xl border px-2 py-1 text-[11px] font-semibold transition ${
                         newListIcon === opt.src
                           ? "border-terracotta-500 bg-terracotta-50 text-[#1e1916]"
                           : "border-transparent bg-[#f3ede4] text-[#5c5047] hover:bg-[#eae0d3]"
@@ -699,292 +688,254 @@ export default function CommonAreaView({
                       <img
                         src={opt.src}
                         alt={opt.label}
-                        className="h-5 w-5 object-contain mix-blend-multiply"
+                        className="h-4 w-4 object-contain mix-blend-multiply"
                       />
                       {opt.label}
                     </button>
                   ))}
                 </div>
-              </div>
-            </motion.form>
-          )}
-        </AnimatePresence>
+              </motion.form>
+            )}
+          </AnimatePresence>
 
-        {/* Lists Grid */}
-        {loading ? (
-          <div className="domus-card p-8 text-center text-xs text-[#6b5d53]">
-            Loading shared lists...
-          </div>
-        ) : lists.length === 0 ? (
-          <div className="domus-card flex flex-col items-center justify-center gap-3 p-10 text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/board-3d.png"
-              alt="Shared lists"
-              className="h-20 w-20 object-contain mix-blend-multiply"
-            />
-            <div>
-              <h3 className="text-base font-bold text-[#1e1916]">
-                No shared lists yet
-              </h3>
-              <p className="mt-1 max-w-sm text-xs text-[#6b5d53]">
-                Start your first shared list — like Groceries, Weekly Meal Prep,
-                Chores, or Family Birthdays. Everyone in the house sees and
-                updates it together.
-              </p>
+          {/* Lists Grid (2 cols on sm+) */}
+          {loading ? (
+            <div className="domus-card p-6 text-center text-xs text-[#6b5d53]">
+              Loading shared lists...
             </div>
-            <button
-              type="button"
-              onClick={() => setNewListOpen(true)}
-              className="domus-btn-accent mt-1 text-xs"
-            >
-              <Plus className="h-4 w-4" />
-              Create Your First List
-            </button>
-          </div>
-        ) : (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {lists.map((list) => {
-              const draft = draftItems[list.id] ?? { title: "", dueDate: "" };
-              const isDropTarget = dragOverListId === list.id;
+          ) : lists.length === 0 ? (
+            <div className="domus-card flex flex-col items-center justify-center gap-3 p-8 text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/board-3d.png"
+                alt="Shared lists"
+                className="h-16 w-16 object-contain mix-blend-multiply"
+              />
+              <div>
+                <h3 className="text-sm font-bold text-[#1e1916]">
+                  No shared lists yet
+                </h3>
+                <p className="mt-1 max-w-xs text-xs text-[#6b5d53]">
+                  Create any list for the whole house — groceries, meal prep,
+                  errands, or birthdays.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewListOpen(true)}
+                className="domus-btn-accent py-2 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Create First List
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {lists.map((list) => {
+                const draft = draftItems[list.id] ?? { title: "", dueDate: "" };
+                const isDropTarget = dragOverListId === list.id;
 
-              return (
-                <div
-                  key={list.id}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (dragOverListId !== list.id) setDragOverListId(list.id);
-                  }}
-                  onDragLeave={() => {
-                    if (dragOverListId === list.id) setDragOverListId(null);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    handleDropOnList(list.id);
-                  }}
-                  className={`domus-card flex flex-col justify-between p-5 transition-all ${
-                    isDropTarget
-                      ? "ring-2 ring-terracotta-500 scale-[1.01]"
-                      : ""
-                  }`}
-                >
-                  <div className="space-y-4">
-                    {/* List Header */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={getListIconSrc(list.type)}
-                          alt={list.title}
-                          className="h-9 w-9 shrink-0 object-contain mix-blend-multiply"
-                        />
-                        <div>
-                          <h3 className="text-sm font-extrabold text-[#1e1916]">
-                            {list.title}
-                          </h3>
-                          <p className="text-[11px] text-[#6b5d53]">
-                            {list.items.filter((i) => !i.isCompleted).length}{" "}
-                            remaining · {list.items.length} total
-                          </p>
+                return (
+                  <div
+                    key={list.id}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragOverListId !== list.id)
+                        setDragOverListId(list.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverListId === list.id) setDragOverListId(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDropOnList(list.id);
+                    }}
+                    className={`domus-card flex flex-col justify-between p-4 transition-all ${
+                      isDropTarget
+                        ? "ring-2 ring-terracotta-500 scale-[1.01]"
+                        : ""
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      {/* List Header */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={getListIconSrc(list.type)}
+                            alt={list.title}
+                            className="h-8 w-8 shrink-0 object-contain mix-blend-multiply"
+                          />
+                          <div>
+                            <h3 className="text-sm font-extrabold leading-tight text-[#1e1916]">
+                              {list.title}
+                            </h3>
+                            <p className="text-[10px] text-[#6b5d53]">
+                              {list.items.filter((i) => !i.isCompleted).length}{" "}
+                              left · {list.items.length} total
+                            </p>
+                          </div>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteList(list.id)}
+                          title="Delete list"
+                          className="rounded-lg p-1 text-[#8a7c71] transition hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteList(list.id)}
-                        title="Delete list"
-                        className="rounded-xl p-1.5 text-[#8a7c71] transition hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Draggable Items */}
-                    <div className="space-y-2">
-                      {list.items.length === 0 ? (
-                        <p className="rounded-2xl border border-dashed border-[#dfd4c6] px-3 py-4 text-center text-xs text-[#8a7c71]">
-                          Add an item below or drag one here from another list.
-                        </p>
-                      ) : (
-                        list.items.map((item) => (
-                          <div
-                            key={item.id}
-                            draggable
-                            onDragStart={() =>
-                              setDraggedItem({
-                                id: item.id,
-                                fromListId: list.id,
-                              })
-                            }
-                            onDragEnd={() => {
-                              setDraggedItem(null);
-                              setDragOverListId(null);
-                            }}
-                            className={`group flex cursor-grab items-center gap-2.5 rounded-2xl bg-[#f3ede4] px-3 py-2.5 transition active:cursor-grabbing ${
-                              item.isCompleted ? "opacity-60" : ""
-                            }`}
-                          >
-                            <GripVertical className="h-3.5 w-3.5 shrink-0 text-[#a09184]" />
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleToggleItem(item.id, item.isCompleted)
+                      {/* Draggable Items */}
+                      <div className="space-y-1.5">
+                        {list.items.length === 0 ? (
+                          <p className="rounded-xl border border-dashed border-[#dfd4c6] px-2.5 py-3 text-center text-[11px] text-[#8a7c71]">
+                            Add an item or drag one here.
+                          </p>
+                        ) : (
+                          list.items.map((item) => (
+                            <div
+                              key={item.id}
+                              draggable
+                              onDragStart={() =>
+                                setDraggedItem({
+                                  id: item.id,
+                                  fromListId: list.id,
+                                })
                               }
-                              aria-label={
-                                item.isCompleted
-                                  ? "Mark incomplete"
-                                  : "Mark done"
-                              }
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border-2 transition ${
-                                item.isCompleted
-                                  ? "border-sage-600 bg-sage-600 text-white"
-                                  : "border-[#b8aa9c] bg-white hover:border-terracotta-500"
+                              onDragEnd={() => {
+                                setDraggedItem(null);
+                                setDragOverListId(null);
+                              }}
+                              className={`group flex cursor-grab items-center gap-2 rounded-xl bg-[#f3ede4] px-2.5 py-2 transition active:cursor-grabbing ${
+                                item.isCompleted ? "opacity-60" : ""
                               }`}
                             >
-                              {item.isCompleted && (
-                                <Check className="h-3 w-3 stroke-[3]" />
-                              )}
-                            </button>
+                              <GripVertical className="h-3 w-3 shrink-0 text-[#a09184]" />
 
-                            <div className="min-w-0 flex-1">
-                              <p
-                                className={`truncate text-xs font-semibold ${
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleToggleItem(item.id, item.isCompleted)
+                                }
+                                aria-label={
                                   item.isCompleted
-                                    ? "text-[#7c6e63] line-through"
-                                    : "text-[#1e1916]"
+                                    ? "Mark incomplete"
+                                    : "Mark done"
+                                }
+                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition ${
+                                  item.isCompleted
+                                    ? "border-sage-600 bg-sage-600 text-white"
+                                    : "border-[#b8aa9c] bg-white hover:border-terracotta-500"
                                 }`}
                               >
-                                {item.title}
-                              </p>
-                              {item.dueDate && (
-                                <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-terracotta-600">
-                                  <CalendarIcon className="h-2.5 w-2.5" />
-                                  {item.dueDate}
+                                {item.isCompleted && (
+                                  <Check className="h-2.5 w-2.5 stroke-[3]" />
+                                )}
+                              </button>
+
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className={`truncate text-xs font-semibold ${
+                                    item.isCompleted
+                                      ? "text-[#7c6e63] line-through"
+                                      : "text-[#1e1916]"
+                                  }`}
+                                >
+                                  {item.title}
                                 </p>
-                              )}
+                                {item.dueDate && (
+                                  <p className="inline-flex items-center gap-1 text-[10px] font-semibold text-terracotta-600">
+                                    <CalendarIcon className="h-2.5 w-2.5" />
+                                    {item.dueDate}
+                                  </p>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteItem(item.id)}
+                                title="Remove item"
+                                className="rounded-md p-0.5 text-[#8a7c71] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteItem(item.id)}
-                              title="Remove item"
-                              className="rounded-lg p-1 text-[#8a7c71] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))
-                      )}
+                          ))
+                        )}
+                      </div>
                     </div>
+
+                    {/* Inline Add Item Row */}
+                    <form
+                      onSubmit={(e) => handleAddItem(e, list.id)}
+                      className="mt-3 space-y-1.5 border-t border-[#e8dfd3] pt-2.5"
+                    >
+                      <div className="flex gap-1.5">
+                        <input
+                          value={draft.title}
+                          onChange={(e) =>
+                            setDraftItems((prev) => ({
+                              ...prev,
+                              [list.id]: { ...draft, title: e.target.value },
+                            }))
+                          }
+                          placeholder="Add item..."
+                          className="domus-input py-1.5 text-xs"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!draft.title.trim()}
+                          className="domus-btn-primary shrink-0 px-2.5 py-1.5 text-xs disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-[#7c6e63]">
+                          <CalendarIcon className="h-2.5 w-2.5" />
+                          Date (optional):
+                        </span>
+                        <input
+                          type="date"
+                          value={draft.dueDate}
+                          onChange={(e) =>
+                            setDraftItems((prev) => ({
+                              ...prev,
+                              [list.id]: { ...draft, dueDate: e.target.value },
+                            }))
+                          }
+                          className="rounded-lg border border-[#dfd4c6] bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-[#4e433b]"
+                        />
+                      </div>
+                    </form>
                   </div>
-
-                  {/* Inline Add Item Row (with optional date that auto-syncs to Family Calendar!) */}
-                  <form
-                    onSubmit={(e) => handleAddItem(e, list.id)}
-                    className="mt-4 space-y-2 border-t border-[#e8dfd3] pt-3.5"
-                  >
-                    <div className="flex gap-2">
-                      <input
-                        value={draft.title}
-                        onChange={(e) =>
-                          setDraftItems((prev) => ({
-                            ...prev,
-                            [list.id]: { ...draft, title: e.target.value },
-                          }))
-                        }
-                        placeholder="Add an item..."
-                        className="domus-input py-2 text-xs"
-                      />
-                      <button
-                        type="submit"
-                        disabled={!draft.title.trim()}
-                        className="domus-btn-primary shrink-0 px-3 py-2 text-xs disabled:opacity-40"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="flex items-center gap-1.5 text-[10px] font-semibold text-[#7c6e63]">
-                        <CalendarIcon className="h-3 w-3" />
-                        Optional date (shows on Calendar):
-                      </label>
-                      <input
-                        type="date"
-                        value={draft.dueDate}
-                        onChange={(e) =>
-                          setDraftItems((prev) => ({
-                            ...prev,
-                            [list.id]: { ...draft, dueDate: e.target.value },
-                          }))
-                        }
-                        className="rounded-lg border border-[#dfd4c6] bg-white/80 px-2 py-0.5 text-[11px] font-medium text-[#4e433b]"
-                      />
-                    </div>
-                  </form>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* SECTION 3: FAMILY CALENDAR (HOLIDAYS, BIRTHDAYS & SAVED FAMILY DATES) */}
-      <section className="domus-card p-6 sm:p-7">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/calendar-3d.png"
-              alt="Family Calendar"
-              className="h-12 w-12 shrink-0 object-contain mix-blend-multiply"
-            />
-            <div>
-              <h2 className="text-xl font-extrabold tracking-tight text-[#1e1916]">
-                Family Calendar
-              </h2>
-              <p className="text-xs text-[#6b5d53]">
-                Public holidays, family &amp; relative birthdays, and any dated
-                items from your shared lists. Click any day to add.
-              </p>
+                );
+              })}
             </div>
-          </div>
+          )}
+        </section>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-2xl bg-[#f3ede4] p-1">
-              <button
-                type="button"
-                onClick={() =>
-                  setCalCursor(new Date(calendarYear, calendarMonth - 1, 1))
-                }
-                className="rounded-xl p-1.5 text-[#4e433b] hover:bg-white"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="min-w-[130px] text-center text-xs font-extrabold text-[#1e1916]">
-                {monthLabel}
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setCalCursor(new Date(calendarYear, calendarMonth + 1, 1))
-                }
-                className="rounded-xl p-1.5 text-[#4e433b] hover:bg-white"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+        {/* RIGHT 5 COLS: COMPACT STICKY FAMILY CALENDAR (FITS IN VIEWPORT) */}
+        <section className="domus-card p-4 sm:p-5 lg:sticky lg:top-20 lg:col-span-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/calendar-3d.png"
+                alt="Family Calendar"
+                className="h-8 w-8 shrink-0 object-contain mix-blend-multiply"
+              />
+              <div>
+                <h2 className="text-base font-extrabold leading-tight tracking-tight text-[#1e1916]">
+                  Family Calendar
+                </h2>
+                <p className="text-[10px] text-[#6b5d53]">
+                  Holidays, birthdays &amp; dated list items
+                </p>
+              </div>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date();
-                setCalCursor(new Date(now.getFullYear(), now.getMonth(), 1));
-              }}
-              className="domus-btn-secondary py-2 text-xs"
-            >
-              Today
-            </button>
 
             <button
               type="button"
@@ -995,114 +946,156 @@ export default function CommonAreaView({
                 setEventNotes("");
                 setEventModalOpen(true);
               }}
-              className="domus-btn-accent py-2 text-xs"
+              className="domus-btn-accent px-3 py-1.5 text-[11px]"
             >
-              <Plus className="h-3.5 w-3.5" />
-              Add Event / Birthday
+              <Plus className="h-3 w-3" />
+              Add
             </button>
           </div>
-        </div>
 
-        {/* Legend */}
-        <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b5d53]">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
-            Public Holidays
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-            Birthdays (Yearly)
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-sage-600" />
-            Family Events
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-            From Shared Lists
-          </span>
-        </div>
-
-        {/* Month Grid */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div
-              key={day}
-              className="py-1.5 text-center text-[11px] font-bold uppercase tracking-wider text-[#7c6e63]"
-            >
-              {day}
-            </div>
-          ))}
-
-          {monthDays.map((cell) => {
-            if (!cell.date) {
-              return (
-                <div
-                  key={cell.key}
-                  className="min-h-[84px] rounded-2xl bg-[#f3ede4]/35 sm:min-h-[96px]"
-                />
-              );
-            }
-
-            const dayEntries = entriesByDate[cell.key] ?? [];
-            const isToday = cell.key === todayKey;
-
-            return (
+          {/* Month Controls + Legend */}
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 rounded-xl bg-[#f3ede4] p-0.5">
               <button
-                key={cell.key}
                 type="button"
-                onClick={() => {
-                  setEventDate(cell.key);
-                  setEventCategory("FAMILY");
-                  setEventTitle("");
-                  setEventNotes("");
-                  setEventModalOpen(true);
-                }}
-                className={`flex min-h-[84px] flex-col items-start gap-1 rounded-2xl p-2 text-left transition sm:min-h-[96px] ${
-                  isToday
-                    ? "bg-terracotta-50 ring-2 ring-terracotta-500"
-                    : "bg-[#f3ede4]/75 hover:bg-[#ece3d6]"
-                }`}
+                onClick={() =>
+                  setCalCursor(new Date(calendarYear, calendarMonth - 1, 1))
+                }
+                className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
               >
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <span className="min-w-[112px] text-center text-xs font-extrabold text-[#1e1916]">
+                {monthLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCalCursor(new Date(calendarYear, calendarMonth + 1, 1))
+                }
+                className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                setCalCursor(new Date(now.getFullYear(), now.getMonth(), 1));
+              }}
+              className="domus-btn-secondary px-2.5 py-1 text-[11px]"
+            >
+              Today
+            </button>
+          </div>
+
+          <div className="mb-2 flex flex-wrap items-center gap-2.5 text-[10px] font-semibold text-[#6b5d53]">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-sky-500" />
+              Holiday
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-rose-500" />
+              Birthday
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-sage-600" />
+              Event
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              List
+            </span>
+          </div>
+
+          {/* Compact Month Grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {["S", "M", "T", "W", "T", "F", "S"].map((day, idx) => (
+              <div
+                key={`${day}-${idx}`}
+                className="py-1 text-center text-[10px] font-bold uppercase text-[#7c6e63]"
+              >
+                {day}
+              </div>
+            ))}
+
+            {monthDays.map((cell) => {
+              if (!cell.date) {
+                return (
+                  <div
+                    key={cell.key}
+                    className="min-h-[54px] rounded-xl bg-[#f3ede4]/35"
+                  />
+                );
+              }
+
+              const dayEntries = entriesByDate[cell.key] ?? [];
+              const isToday = cell.key === todayKey;
+
+              return (
+                <button
+                  key={cell.key}
+                  type="button"
+                  onClick={() => {
+                    setEventDate(cell.key);
+                    setEventCategory("FAMILY");
+                    setEventTitle("");
+                    setEventNotes("");
+                    setEventModalOpen(true);
+                  }}
+                  title={
+                    dayEntries.length > 0
+                      ? dayEntries.map((e) => e.title).join(" · ")
+                      : `Add to ${cell.key}`
+                  }
+                  className={`flex min-h-[54px] flex-col items-start gap-0.5 rounded-xl p-1 text-left transition ${
                     isToday
-                      ? "bg-terracotta-500 text-white"
-                      : "text-[#3d342e]"
+                      ? "bg-terracotta-50 ring-2 ring-terracotta-500"
+                      : "bg-[#f3ede4]/75 hover:bg-[#ece3d6]"
                   }`}
                 >
-                  {cell.date.getDate()}
-                </span>
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                      isToday
+                        ? "bg-terracotta-500 text-white"
+                        : "text-[#3d342e]"
+                    }`}
+                  >
+                    {cell.date.getDate()}
+                  </span>
 
-                <div className="w-full space-y-1">
-                  {dayEntries.slice(0, 3).map((entry) => (
-                    <div
-                      key={entry.id}
-                      className={`truncate rounded-lg px-1.5 py-0.5 text-[10px] font-bold ${
-                        entry.kind === "HOLIDAY"
-                          ? "bg-sky-100 text-sky-900"
-                          : entry.kind === "BIRTHDAY"
-                          ? "bg-rose-100 text-rose-900"
-                          : entry.kind === "LIST_ITEM"
-                          ? "bg-amber-100 text-amber-900"
-                          : "bg-sage-100 text-sage-900"
-                      }`}
-                    >
-                      {entry.kind === "BIRTHDAY" ? "🎂 " : ""}
-                      {entry.title}
-                    </div>
-                  ))}
-                  {dayEntries.length > 3 && (
-                    <p className="px-1 text-[10px] font-bold text-[#6b5d53]">
-                      +{dayEntries.length - 3} more
-                    </p>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+                  <div className="w-full space-y-0.5">
+                    {dayEntries.slice(0, 2).map((entry) => (
+                      <div
+                        key={entry.id}
+                        className={`truncate rounded px-1 py-0.5 text-[9px] font-bold leading-none ${
+                          entry.kind === "HOLIDAY"
+                            ? "bg-sky-100 text-sky-900"
+                            : entry.kind === "BIRTHDAY"
+                            ? "bg-rose-100 text-rose-900"
+                            : entry.kind === "LIST_ITEM"
+                            ? "bg-amber-100 text-amber-900"
+                            : "bg-sage-100 text-sage-900"
+                        }`}
+                      >
+                        {entry.kind === "BIRTHDAY" ? "🎂 " : ""}
+                        {entry.title}
+                      </div>
+                    ))}
+                    {dayEntries.length > 2 && (
+                      <p className="px-0.5 text-[9px] font-bold text-[#6b5d53]">
+                        +{dayEntries.length - 2}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      </div>
 
       {/* MODAL 1: KNOCK ON A FAMILY MEMBER'S DOOR (Quiet Knock OR With Message) */}
       <AnimatePresence>

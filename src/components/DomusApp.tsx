@@ -470,7 +470,7 @@ export default function DomusApp() {
       </header>
 
       {/* Main Spatial Area: Common Area OR Inside a Room */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
+      <main className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 lg:py-5">
         <AnimatePresence mode="wait">
           {inRoomOwnerId ? (
             <motion.div
