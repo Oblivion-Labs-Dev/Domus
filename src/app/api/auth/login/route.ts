@@ -7,10 +7,9 @@ import { parsePermissions } from "@/lib/rbac";
 
 /**
  * Production Authentication Endpoint
- * Supports:
- * 1. House Name or House Key + Your Name + Room Key (Password)
- * 2. Email + Room Key (Password)
- * Note: Demo role switching is strictly isolated to the Demo Residence (/api/demo).
+ * - Enter House: House Name (or House Key) + Your Room Key (Password).
+ *   Domus automatically identifies which family member owns that Room Key.
+ * - Demo switcher: strictly isolated to the Demo Residence ("hh_demo_house").
  */
 export async function POST(request: Request) {
   await ensureTables();
@@ -19,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Strictly scoped Demo-House switcher (ONLY works inside the dedicated Demo Residence!)
+  // Strictly scoped Demo-House switcher (ONLY works inside the dedicated Demo Residence)
   if (typeof body.demoSwitchMemberId === "string") {
     const rows = await db
       .select()
@@ -54,64 +53,44 @@ export async function POST(request: Request) {
     });
   }
 
-  const roomKey = String(body.roomKey ?? body.password ?? "").trim();
-  if (!roomKey) {
-    return NextResponse.json(
-      { error: "Please enter your Room Key." },
-      { status: 400 }
-    );
-  }
-
-  let matchedMember: typeof members.$inferSelect | undefined;
-
-  // Path A: House Name / House Key + Member Name + Room Key
   const houseIdentifier = String(body.houseIdentifier ?? "").trim();
-  const memberName = String(body.memberName ?? "").trim();
+  const roomKey = String(body.roomKey ?? body.password ?? "").trim();
 
-  if (houseIdentifier && memberName) {
-    const allHouses = await db.select().from(households);
-    const normalizedHouse = houseIdentifier.toLowerCase();
-    const house = allHouses.find(
-      (h) =>
-        h.houseKey.toLowerCase() === normalizedHouse ||
-        h.name.toLowerCase() === normalizedHouse
-    );
-
-    if (!house) {
-      return NextResponse.json(
-        { error: "House not found. Check your House Name or House Key." },
-        { status: 401 }
-      );
-    }
-
-    const houseMembers = await db
-      .select()
-      .from(members)
-      .where(eq(members.householdId, house.id));
-
-    matchedMember = houseMembers.find(
-      (m) =>
-        m.name.toLowerCase() === memberName.toLowerCase() ||
-        m.email.toLowerCase() === memberName.toLowerCase()
-    );
-  } else if (typeof body.email === "string" && body.email.trim()) {
-    // Path B: Direct Email + Room Key
-    const rows = await db
-      .select()
-      .from(members)
-      .where(eq(members.email, body.email.trim().toLowerCase()))
-      .limit(1);
-    matchedMember = rows[0];
-  } else {
+  if (!houseIdentifier || !roomKey) {
     return NextResponse.json(
-      { error: "Enter your House Name (or Key), your Name, and your Room Key." },
+      { error: "Please enter your House Name (or Key) and your Room Key." },
       { status: 400 }
     );
   }
 
-  if (!matchedMember || !verifyPassword(roomKey, matchedMember.passwordHash)) {
+  const allHouses = await db.select().from(households);
+  const normalizedHouse = houseIdentifier.toLowerCase();
+  const house = allHouses.find(
+    (h) =>
+      h.houseKey.toLowerCase() === normalizedHouse ||
+      h.name.toLowerCase() === normalizedHouse
+  );
+
+  if (!house) {
     return NextResponse.json(
-      { error: "Invalid credentials. Check your House, Name, or Room Key." },
+      { error: "House not found. Check your House Name or House Key." },
+      { status: 401 }
+    );
+  }
+
+  const houseMembers = await db
+    .select()
+    .from(members)
+    .where(eq(members.householdId, house.id));
+
+  // Automatically identify the member whose Room Key matches!
+  const matchedMember = houseMembers.find((m) =>
+    verifyPassword(roomKey, m.passwordHash)
+  );
+
+  if (!matchedMember) {
+    return NextResponse.json(
+      { error: "That Room Key doesn't unlock any room in this house." },
       { status: 401 }
     );
   }

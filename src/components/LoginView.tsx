@@ -22,18 +22,14 @@ interface LoginViewProps {
 }
 
 export default function LoginView({ onAuthenticated }: LoginViewProps) {
-  const [mode, setMode] = useState<"ENTER" | "CREATE" | "JOIN" | "RECOVER">(
-    "ENTER"
-  );
+  const [mode, setMode] = useState<"ENTER" | "CREATE" | "RECOVER">("ENTER");
 
-  // Enter House (Name + House + Room Key)
+  // Enter House (ONLY House Name/Key + Room Key — key identifies the member automatically!)
   const [houseIdentifier, setHouseIdentifier] = useState("");
-  const [memberName, setMemberName] = useState("");
   const [roomKey, setRoomKey] = useState("");
 
-  // Create / Join House
+  // Create House (you become Head of Household by default)
   const [residenceName, setResidenceName] = useState("");
-  const [joinHouseKey, setJoinHouseKey] = useState("");
   const [fullName, setFullName] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [newRoomKey, setNewRoomKey] = useState("");
@@ -57,7 +53,6 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           houseIdentifier,
-          memberName,
           roomKey,
         }),
       });
@@ -72,38 +67,26 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
     }
   }
 
-  async function handleCreateOrJoin(e: React.FormEvent) {
+  async function handleCreateHouse(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const payload =
-        mode === "CREATE"
-          ? {
-              mode: "CREATE",
-              residenceName,
-              name: fullName,
-              email: recoveryEmail,
-              roomKey: newRoomKey,
-              avatarId,
-            }
-          : {
-              mode: "JOIN",
-              houseKey: joinHouseKey,
-              name: fullName,
-              email: recoveryEmail,
-              roomKey: newRoomKey,
-              avatarId,
-            };
-
       const res = await fetch("/api/auth/house", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          mode: "CREATE",
+          residenceName,
+          name: fullName,
+          email: recoveryEmail,
+          roomKey: newRoomKey,
+          avatarId,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Could not set up your space.");
+        setError(data.error ?? "Could not create your house.");
         return;
       }
       await onAuthenticated();
@@ -149,11 +132,11 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-10">
-      {/* Soft luminous studio aurora accents */}
+      {/* Rich architectural ambient lighting */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-emerald-200/40 blur-3xl" />
-        <div className="absolute right-0 top-1/4 h-[28rem] w-[28rem] rounded-full bg-orange-200/35 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-sky-200/30 blur-3xl" />
+        <div className="absolute -left-24 -top-24 h-[30rem] w-[30rem] rounded-full bg-emerald-500/15 blur-3xl" />
+        <div className="absolute right-0 top-1/4 h-[32rem] w-[32rem] rounded-full bg-terracotta-500/18 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-amber-400/10 blur-3xl" />
       </div>
 
       <div className="mx-auto max-w-6xl">
@@ -166,19 +149,19 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
           <div className="flex items-center gap-3">
             <motion.div
               whileHover={{ rotate: -5, y: -2 }}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#163029] text-white shadow-md"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-terracotta-500 text-white shadow-lg"
               style={{
                 boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 0 0 #0c1c17, 0 12px 24px -8px rgba(22,48,41,0.4)",
+                  "inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 0 0 #8f3216, 0 12px 24px -8px rgba(217,83,47,0.5)",
               }}
             >
               <Home className="h-5 w-5" />
             </motion.div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-stone-900">
+              <h1 className="text-lg font-bold tracking-tight text-[#f7f4ee]">
                 Domus
               </h1>
-              <p className="text-[11px] font-medium text-stone-500">
+              <p className="text-[11px] font-medium text-[#9ec0b2]">
                 Oblivion Labs
               </p>
             </div>
@@ -188,9 +171,9 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             type="button"
             disabled={demoLoading}
             onClick={handleEnterDemo}
-            className="domus-btn-secondary py-2 text-xs"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-[#f7f4ee] backdrop-blur-md transition hover:bg-white/20 disabled:opacity-50"
           >
-            <Sparkles className="h-3.5 w-3.5 text-terracotta-500" />
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
             {demoLoading ? "Preparing Demo House..." : "Explore Live Demo"}
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
@@ -206,10 +189,10 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
               transition={{ delay: 0.04 }}
               className="space-y-3"
             >
-              <h2 className="text-4xl font-bold leading-[1.12] tracking-tight text-[#132a21] sm:text-5xl">
+              <h2 className="text-4xl font-bold leading-[1.12] tracking-tight text-[#faf8f3] sm:text-5xl">
                 Build your family&apos;s digital house.
               </h2>
-              <p className="max-w-xl text-base leading-relaxed text-stone-600">
+              <p className="max-w-xl text-base leading-relaxed text-[#bdd4c9]">
                 One calm, flexible space to organize life at home — shared when
                 you want, private when you need, shaped entirely by the people
                 who live in it.
@@ -269,7 +252,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             </motion.div>
           </div>
 
-          {/* Right 5 Cols: Clean Production Auth Card (Enter House / Create / Join) */}
+          {/* Right 5 Cols: Strictly 2 Ways to Enter (Enter House | Create House) */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -277,42 +260,53 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             className="lg:col-span-5"
           >
             <TiltCard maxTilt={3} lift={3} className="space-y-5 p-6 sm:p-7">
-              {/* Primary 2-way switcher + Join with Key */}
-              <div className="grid grid-cols-3 gap-1 rounded-2xl bg-stone-100 p-1 text-xs font-bold">
-                {(
-                  [
-                    ["ENTER", "Enter House"],
-                    ["CREATE", "New House"],
-                    ["JOIN", "Join w/ Key"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => {
-                      setMode(key);
-                      setError(null);
-                      setRecoverResult(null);
-                    }}
-                    className={`rounded-xl py-2 transition ${
-                      mode === key
-                        ? "bg-[#163029] text-white shadow-sm"
-                        : "text-stone-600 hover:text-stone-900"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+              {/* Strictly 2 Tabs */}
+              <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-stone-100 p-1.5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("ENTER");
+                    setError(null);
+                    setRecoverResult(null);
+                  }}
+                  className={`rounded-xl py-2.5 transition ${
+                    mode === "ENTER" || mode === "RECOVER"
+                      ? "bg-[#163029] text-white shadow-sm"
+                      : "text-stone-600 hover:text-stone-900"
+                  }`}
+                >
+                  Enter House
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("CREATE");
+                    setError(null);
+                    setRecoverResult(null);
+                  }}
+                  className={`rounded-xl py-2.5 transition ${
+                    mode === "CREATE"
+                      ? "bg-[#163029] text-white shadow-sm"
+                      : "text-stone-600 hover:text-stone-900"
+                  }`}
+                >
+                  Create House
+                </button>
               </div>
 
-              {/* MODE 1: ENTER EXISTING HOUSE (House Name/Key + Your Name + Room Key) */}
+              {/* WAY 1: ENTER HOUSE (ONLY House Name/Key + Room Key) */}
               {mode === "ENTER" && (
                 <form onSubmit={handleEnterHouse} className="space-y-4">
                   <div className="flex items-center gap-2.5">
                     <DoorOpen className="h-4 w-4 text-terracotta-500" />
-                    <h3 className="text-sm font-bold text-stone-900">
-                      Step Inside Your Residence
-                    </h3>
+                    <div>
+                      <h3 className="text-sm font-bold text-stone-900">
+                        Unlock Your Residence
+                      </h3>
+                      <p className="text-[11px] text-stone-500">
+                        Your Room Key automatically recognizes who you are.
+                      </p>
+                    </div>
                   </div>
 
                   <div>
@@ -329,22 +323,9 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
-                      Your Name
-                    </label>
-                    <input
-                      required
-                      value={memberName}
-                      onChange={(e) => setMemberName(e.target.value)}
-                      placeholder="e.g., Sumeet"
-                      className="domus-input"
-                    />
-                  </div>
-
-                  <div>
                     <div className="mb-1 flex items-center justify-between">
                       <label className="text-xs font-semibold text-stone-600">
-                        Room Key (Password)
+                        Your Room Key
                       </label>
                       <button
                         type="button"
@@ -362,7 +343,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       required
                       value={roomKey}
                       onChange={(e) => setRoomKey(e.target.value)}
-                      placeholder="Enter your private Room Key"
+                      placeholder="Enter your personal key"
                       className="domus-input"
                     />
                   </div>
@@ -384,49 +365,34 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                 </form>
               )}
 
-              {/* MODE 2 & 3: CREATE NEW HOUSE OR JOIN WITH HOUSE KEY */}
-              {(mode === "CREATE" || mode === "JOIN") && (
-                <form onSubmit={handleCreateOrJoin} className="space-y-3.5">
+              {/* WAY 2: CREATE A NEW HOUSE (Head of Household by default) */}
+              {mode === "CREATE" && (
+                <form onSubmit={handleCreateHouse} className="space-y-3.5">
                   <div className="flex items-center gap-2">
-                    {mode === "CREATE" ? (
-                      <PlusCircle className="h-4 w-4 text-terracotta-500" />
-                    ) : (
-                      <KeyRound className="h-4 w-4 text-sage-600" />
-                    )}
-                    <h3 className="text-sm font-bold text-stone-900">
-                      {mode === "CREATE"
-                        ? "Create Your Digital House"
-                        : "Join a Residence with House Key"}
-                    </h3>
+                    <PlusCircle className="h-4 w-4 text-terracotta-500" />
+                    <div>
+                      <h3 className="text-sm font-bold text-stone-900">
+                        Create Your Digital House
+                      </h3>
+                      <p className="text-[11px] text-stone-500">
+                        You start as Head of Household and can add family
+                        members inside.
+                      </p>
+                    </div>
                   </div>
 
-                  {mode === "CREATE" ? (
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-stone-600">
-                        Name Your Residence
-                      </label>
-                      <input
-                        required
-                        value={residenceName}
-                        onChange={(e) => setResidenceName(e.target.value)}
-                        placeholder="e.g., The Suryawanshi Residence"
-                        className="domus-input"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-stone-600">
-                        House Key
-                      </label>
-                      <input
-                        required
-                        value={joinHouseKey}
-                        onChange={(e) => setJoinHouseKey(e.target.value)}
-                        placeholder="e.g., DOMUS-4821"
-                        className="domus-input font-mono uppercase"
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-stone-600">
+                      Name Your Residence
+                    </label>
+                    <input
+                      required
+                      value={residenceName}
+                      onChange={(e) => setResidenceName(e.target.value)}
+                      placeholder="e.g., The Suryawanshi Residence"
+                      className="domus-input"
+                    />
+                  </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
@@ -437,7 +403,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                         required
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Your name"
+                        placeholder="Head of family name"
                         className="domus-input"
                       />
                     </div>
@@ -450,7 +416,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                         required
                         value={recoveryEmail}
                         onChange={(e) => setRecoveryEmail(e.target.value)}
-                        placeholder="For key recovery"
+                        placeholder="If you forget your key"
                         className="domus-input"
                       />
                     </div>
@@ -458,7 +424,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-stone-600">
-                      Set Your Room Key (Password)
+                      Set Your Room Key
                     </label>
                     <input
                       type="password"
@@ -509,26 +475,23 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     disabled={loading}
                     className="domus-btn-accent w-full py-2.5"
                   >
-                    {loading
-                      ? "Setting up..."
-                      : mode === "CREATE"
-                        ? "Create House & Mint House Key"
-                        : "Join Residence"}
+                    <KeyRound className="h-4 w-4" />
+                    {loading ? "Creating..." : "Create House"}
                   </button>
                 </form>
               )}
 
-              {/* MODE 4: FORGOT KEY RECOVERY VIA EMAIL */}
+              {/* FORGOT KEY RECOVERY */}
               {mode === "RECOVER" && (
                 <form onSubmit={handleRecover} className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-terracotta-500" />
                     <h3 className="text-sm font-bold text-stone-900">
-                      Find Your Residence &amp; Key
+                      Find Your House &amp; Key
                     </h3>
                   </div>
                   <p className="text-xs text-stone-500">
-                    Enter the recovery email you used when your profile was
+                    Enter the recovery email saved when your profile was
                     created.
                   </p>
                   <input
