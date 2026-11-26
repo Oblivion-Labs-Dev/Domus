@@ -39,6 +39,14 @@ import type {
   TrackerDTO,
 } from "./types";
 
+interface EarnedBadge {
+  id: string;
+  title: string;
+  targetSummary: string;
+  iconKey: string;
+  awardedAt: string;
+}
+
 interface PersonalRoomViewProps {
   currentMember: MemberContext;
   roomOwnerId: string;
@@ -93,35 +101,104 @@ export default function PersonalRoomView({
   const [trkUnit, setTrkUnit] = useState("sessions");
   const [trkTarget, setTrkTarget] = useState(5);
 
-  // Confetti celebration + removable Earned Badges
+  // Confetti celebration + independent persistent Earned Badges (survive deleting goals!)
   const [confettiGoalTitle, setConfettiGoalTitle] = useState<string | null>(
     null
   );
-  const [dismissedBadgeIds, setDismissedBadgeIds] = useState<string[]>([]);
+  const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);
+  const [selectedBadge, setSelectedBadge] = useState<EarnedBadge | null>(null);
+
+  const badgeStorageKey = `domus_earned_badges_v2_${roomOwnerId}`;
+  const removedBadgeKey = `domus_removed_badges_v2_${roomOwnerId}`;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const raw = window.localStorage.getItem(
-        `domus_dismissed_badges_${roomOwnerId}`
-      );
-      setDismissedBadgeIds(raw ? (JSON.parse(raw) as string[]) : []);
+      const raw = window.localStorage.getItem(badgeStorageKey);
+      setEarnedBadges(raw ? (JSON.parse(raw) as EarnedBadge[]) : []);
     } catch {
-      setDismissedBadgeIds([]);
+      setEarnedBadges([]);
     }
-  }, [roomOwnerId]);
+  }, [badgeStorageKey]);
 
-  function handleDismissBadge(trackerId: string) {
-    setDismissedBadgeIds((prev) => {
-      const next = Array.from(new Set([...prev, trackerId]));
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          `domus_dismissed_badges_${roomOwnerId}`,
-          JSON.stringify(next)
-        );
+  // Auto-sync any already-100% goals into earnedBadges (unless explicitly removed by user)
+  useEffect(() => {
+    if (typeof window === "undefined" || trackers.length === 0) return;
+    let removedIds: string[] = [];
+    try {
+      const r = window.localStorage.getItem(removedBadgeKey);
+      removedIds = r ? (JSON.parse(r) as string[]) : [];
+    } catch {
+      removedIds = [];
+    }
+
+    setEarnedBadges((prev) => {
+      const existingIds = new Set(prev.map((b) => b.id));
+      const additions: EarnedBadge[] = [];
+      for (const t of trackers) {
+        if (
+          t.currentValue >= t.targetValue &&
+          !existingIds.has(t.id) &&
+          !removedIds.includes(t.id)
+        ) {
+          additions.push({
+            id: t.id,
+            title: t.title,
+            targetSummary: `${t.targetValue} / ${t.targetValue} ${t.unit}`,
+            iconKey: t.category || t.type,
+            awardedAt: new Date().toISOString(),
+          });
+        }
+      }
+      if (additions.length === 0) return prev;
+      const next = [...additions, ...prev];
+      try {
+        window.localStorage.setItem(badgeStorageKey, JSON.stringify(next));
+      } catch {
+        // ignore
       }
       return next;
     });
+  }, [trackers, badgeStorageKey, removedBadgeKey]);
+
+  function awardBadgeForTracker(tracker: TrackerDTO) {
+    const badge: EarnedBadge = {
+      id: tracker.id,
+      title: tracker.title,
+      targetSummary: `${tracker.targetValue} / ${tracker.targetValue} ${tracker.unit}`,
+      iconKey: tracker.category || tracker.type,
+      awardedAt: new Date().toISOString(),
+    };
+    setEarnedBadges((prev) => {
+      const next = [badge, ...prev.filter((b) => b.id !== badge.id)];
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(badgeStorageKey, JSON.stringify(next));
+      }
+      return next;
+    });
+  }
+
+  function handleRemoveBadge(badgeId: string) {
+    setEarnedBadges((prev) => {
+      const next = prev.filter((b) => b.id !== badgeId);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(badgeStorageKey, JSON.stringify(next));
+        try {
+          const r = window.localStorage.getItem(removedBadgeKey);
+          const removedIds = r ? (JSON.parse(r) as string[]) : [];
+          if (!removedIds.includes(badgeId)) {
+            window.localStorage.setItem(
+              removedBadgeKey,
+              JSON.stringify([...removedIds, badgeId])
+            );
+          }
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+    setSelectedBadge((prev) => (prev?.id === badgeId ? null : prev));
   }
 
   const isOwnRoom = roomOwnerId === currentMember.id;
@@ -361,8 +438,7 @@ export default function PersonalRoomView({
     });
 
     if (res.ok && willBeComplete) {
-      // Un-dismiss badge if they re-completed it, and launch confetti!
-      setDismissedBadgeIds((prev) => prev.filter((id) => id !== tracker.id));
+      awardBadgeForTracker(tracker);
       setConfettiGoalTitle(tracker.title);
       setTimeout(() => setConfettiGoalTitle(null), 2600);
     }
@@ -438,10 +514,6 @@ export default function PersonalRoomView({
   const isDoorOpen = Boolean(config?.isPublic);
   const taskCards = cards.filter((c) => c.cardType !== "NOTE");
   const noteCards = cards.filter((c) => c.cardType === "NOTE");
-  const earnedBadges = trackers.filter(
-    (t) =>
-      t.currentValue >= t.targetValue && !dismissedBadgeIds.includes(t.id)
-  );
 
   const NOTE_SWATCHES: Array<{
     id: "butter" | "cream" | "terracotta" | "sage" | "sky";
@@ -629,7 +701,7 @@ export default function PersonalRoomView({
           </div>
         </div>
 
-        {/* Earned Goal Badges Shelf (with 1-click Remove permission for room owner) */}
+        {/* Earned Goal Badges Shelf (persists even after deleting goals; click to inspect!) */}
         {earnedBadges.length > 0 && (
           <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-[#e8dfd3] pt-3">
             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-600">
@@ -637,34 +709,42 @@ export default function PersonalRoomView({
               Earned Badges:
             </span>
             {earnedBadges.map((b) => {
-              const icon =
-                getMiniatureByIdOrSrc(b.category) ??
-                getMiniatureByIdOrSrc(b.type);
+              const icon = getMiniatureByIdOrSrc(b.iconKey);
               return (
-                <span
+                <div
                   key={b.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-100/90 px-2.5 py-1 text-[11px] font-extrabold text-amber-950 shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300/80 bg-amber-100/90 pl-2.5 pr-1.5 py-1 text-[11px] font-extrabold text-amber-950 shadow-sm transition hover:scale-[1.03]"
                 >
-                  {icon && (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={icon.src}
-                      alt=""
-                      className="h-4 w-4 rounded object-contain"
-                    />
-                  )}
-                  🏆 {b.title}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBadge(b)}
+                    title="Click to see what this badge was awarded for"
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    {icon && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={icon.src}
+                        alt=""
+                        className="h-4 w-4 rounded object-contain"
+                      />
+                    )}
+                    🏆 {b.title}
+                  </button>
                   {isOwnRoom && (
                     <button
                       type="button"
-                      onClick={() => handleDismissBadge(b.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveBadge(b.id);
+                      }}
                       title="Remove badge"
                       className="ml-0.5 rounded-full p-0.5 opacity-70 transition hover:bg-black/10 hover:opacity-100"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   )}
-                </span>
+                </div>
               );
             })}
           </div>
@@ -1193,6 +1273,96 @@ export default function PersonalRoomView({
           </div>
         )}
       </section>
+
+      {/* BADGE DETAIL MODAL (Click any badge to see what it was for & when it was awarded) */}
+      <AnimatePresence>
+        {selectedBadge && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedBadge(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              onClick={(e) => e.stopPropagation()}
+              className="domus-card relative w-full max-w-sm space-y-4 p-6 text-center"
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedBadge(null)}
+                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] hover:bg-[#e5d9ca]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border-2 border-amber-300 bg-amber-100/90 shadow-md">
+                {getMiniatureByIdOrSrc(selectedBadge.iconKey) ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={getMiniatureByIdOrSrc(selectedBadge.iconKey)!.src}
+                    alt={selectedBadge.title}
+                    className="h-14 w-14 object-contain"
+                  />
+                ) : (
+                  <Award className="h-10 w-10 text-amber-600" />
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600">
+                  🏆 Achievement Badge
+                </p>
+                <h3 className="text-lg font-extrabold text-[#1e1916]">
+                  {selectedBadge.title}
+                </h3>
+                <p className="text-xs font-semibold text-[#5c5047]">
+                  Completed goal: {selectedBadge.targetSummary}
+                </p>
+                <p className="text-[11px] text-[#7c6e63]">
+                  Awarded on{" "}
+                  {new Date(selectedBadge.awardedAt).toLocaleDateString(
+                    "en-US",
+                    {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    }
+                  )}{" "}
+                  at{" "}
+                  {new Date(selectedBadge.awardedAt).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                {isOwnRoom && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveBadge(selectedBadge.id)}
+                    className="domus-btn-secondary flex-1 py-2 text-xs text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Remove Badge
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedBadge(null)}
+                  className="domus-btn-accent flex-1 py-2 text-xs"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* SCHEDULE PERSONAL TASK MODAL */}
       <AnimatePresence>
