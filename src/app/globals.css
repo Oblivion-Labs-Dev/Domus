@@ -158,8 +158,8 @@ html.dark {
 }
 
 html.dark body {
-  background-color: var(--domus-bg-base) !important;
-  background-image: var(--domus-bg-grad) !important;
+  background-color: var(--domus-bg-base);
+  background-image: var(--domus-bg-grad);
   color: #f5efe6;
 }
 
@@ -193,11 +193,44 @@ html.dark .domus-input::placeholder {
 html.dark .domus-btn-secondary {
   background-color: #2e2824;
   color: #f5efe6;
-  border-color: rgba(255, 240, 224, 0.12);
+  border-color: rgba(255, 240, 224, 0.14);
+  box-shadow:
+    0 6px 14px -4px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 244, 232, 0.1);
 }
 
 html.dark .domus-btn-secondary:hover {
-  background-color: #39322c;
+  background-color: #3a322c;
+}
+
+/* Fix Today highlight, calendar event pills, and door badges in Night Mode */
+html.dark .bg-terracotta-50 {
+  background-color: rgba(224, 93, 56, 0.22) !important;
+}
+
+html.dark .bg-sky-100 {
+  background-color: rgba(56, 189, 248, 0.22) !important;
+  color: #bae6fd !important;
+}
+
+html.dark .bg-rose-100 {
+  background-color: rgba(251, 113, 133, 0.24) !important;
+  color: #fecdd3 !important;
+}
+
+html.dark .bg-sage-100 {
+  background-color: rgba(74, 222, 128, 0.18) !important;
+  color: #bbf7d0 !important;
+}
+
+html.dark .bg-amber-100 {
+  background-color: rgba(251, 191, 36, 0.22) !important;
+  color: #fde68a !important;
+}
+
+html.dark .bg-\[\#e7dfd4\] {
+  background-color: #3b342e !important;
+  color: #e7dcd0 !important;
 }
 
 html.dark .text-\[\#1e1916\],

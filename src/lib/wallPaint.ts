@@ -199,19 +199,95 @@ export function applyWallPaintToDocument(config: WallPaintConfig): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const body = document.body;
+  const isDark = root.classList.contains("dark");
 
   const patternDef =
     WALL_PATTERNS.find((p) => p.id === config.pattern) ?? WALL_PATTERNS[0];
 
   if (config.mode === "IMAGE" && config.imageDataUrl) {
-    const wash = Math.max(0, Math.min(0.65, config.imageWash));
-    const overlay = `linear-gradient(rgba(250, 246, 240, ${wash}), rgba(250, 246, 240, ${wash}))`;
-    body.style.backgroundColor = "#efe6dc";
+    const wash = isDark
+      ? Math.max(0.62, Math.min(0.82, config.imageWash + 0.4))
+      : Math.max(0, Math.min(0.65, config.imageWash));
+    const overlay = isDark
+      ? `linear-gradient(rgba(18, 15, 13, ${wash}), rgba(18, 15, 13, ${wash}))`
+      : `linear-gradient(rgba(250, 246, 240, ${wash}), rgba(250, 246, 240, ${wash}))`;
+    body.style.backgroundColor = isDark ? "#131110" : "#efe6dc";
     body.style.backgroundImage = `${overlay}, url("${config.imageDataUrl}")`;
     body.style.backgroundSize = "cover, cover";
     body.style.backgroundPosition = "center, center";
     body.style.backgroundRepeat = "no-repeat, no-repeat";
     body.style.backgroundAttachment = "fixed, fixed";
+    return;
+  }
+
+  // In Night Mode, dim any wall paint into a cozy nocturnal architectural wash
+  if (isDark) {
+    const darkPresetMap: Record<string, { base: string; grad: string }> = {
+      plaster: {
+        base: "#141110",
+        grad: "linear-gradient(135deg, #1d1613 0%, #141211 50%, #121a16 100%)",
+      },
+      sage: {
+        base: "#101714",
+        grad: "linear-gradient(135deg, #121e18 0%, #111815 52%, #151b18 100%)",
+      },
+      terracotta: {
+        base: "#191210",
+        grad: "linear-gradient(135deg, #251713 0%, #1a1311 52%, #171211 100%)",
+      },
+      linen: {
+        base: "#151412",
+        grad: "linear-gradient(135deg, #1c1a17 0%, #151412 52%, #121110 100%)",
+      },
+      sky: {
+        base: "#0f151d",
+        grad: "linear-gradient(135deg, #121c28 0%, #111720 52%, #171514 100%)",
+      },
+      sandstone: {
+        base: "#171314",
+        grad: "linear-gradient(135deg, #21181a 0%, #181416 52%, #141318 100%)",
+      },
+      ochre: {
+        base: "#18150f",
+        grad: "linear-gradient(135deg, #241d12 0%, #191611 52%, #161411 100%)",
+      },
+      lavender: {
+        base: "#15131c",
+        grad: "linear-gradient(135deg, #1e1929 0%, #16141d 52%, #191516 100%)",
+      },
+      olive: {
+        base: "#141711",
+        grad: "linear-gradient(135deg, #1c2116 0%, #151812 52%, #171612 100%)",
+      },
+      blush: {
+        base: "#1a1314",
+        grad: "linear-gradient(135deg, #26181a 0%, #1b1515 52%, #181513 100%)",
+      },
+      slate: {
+        base: "#11161b",
+        grad: "linear-gradient(135deg, #161e26 0%, #13181d 52%, #161616 100%)",
+      },
+      matcha: {
+        base: "#121813",
+        grad: "linear-gradient(135deg, #172318 0%, #131914 52%, #181713 100%)",
+      },
+    };
+
+    const night =
+      config.mode === "CUSTOM"
+        ? {
+            base: "#141211",
+            grad: `linear-gradient(rgba(16, 14, 12, 0.84), rgba(16, 14, 12, 0.88)), linear-gradient(135deg, ${config.customColor1} 0%, ${config.customColor2} 100%)`,
+          }
+        : darkPresetMap[config.presetId] ?? darkPresetMap.plaster;
+
+    root.style.setProperty("--domus-bg-base", night.base);
+    root.style.setProperty("--domus-bg-grad", night.grad);
+    body.style.backgroundColor = night.base;
+    body.style.backgroundImage = night.grad;
+    body.style.backgroundSize = "cover";
+    body.style.backgroundRepeat = "no-repeat";
+    body.style.backgroundAttachment = "fixed";
     return;
   }
 

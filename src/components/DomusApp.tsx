@@ -95,6 +95,7 @@ export default function DomusApp() {
       const dark = p === "dark" ? true : p === "light" ? false : computeNight();
       setIsDark(dark);
       document.documentElement.classList.toggle("dark", dark);
+      applyWallPaintToDocument(loadWallPaintConfig());
     };
 
     apply(pref);
@@ -120,6 +121,7 @@ export default function DomusApp() {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("domus_theme_pref", nextPref);
     }
+    applyWallPaintToDocument(wallConfig);
   }
 
   useEffect(() => {
