@@ -58,6 +58,38 @@ export default function DomusApp() {
   // Spatial navigation: directly inside Common Area, or inside a Room (yours or someone you were let into)
   const [inRoomOwnerId, setInRoomOwnerId] = useState<string | null>(null);
 
+  const leaveVisitedRoomIfAny = useCallback(
+    async (leavingOwnerId: string | null) => {
+      if (
+        !leavingOwnerId ||
+        !session.member ||
+        leavingOwnerId === session.member.id
+      ) {
+        return;
+      }
+      try {
+        await fetch(
+          `/api/rooms/knocks?roomOwnerId=${encodeURIComponent(leavingOwnerId)}`,
+          { method: "DELETE", keepalive: true }
+        );
+      } catch {
+        // ignore
+      }
+    },
+    [session.member]
+  );
+
+  const navigateRoom = useCallback(
+    async (nextOwnerId: string | null) => {
+      const prev = inRoomOwnerId;
+      if (prev && prev !== nextOwnerId) {
+        await leaveVisitedRoomIfAny(prev);
+      }
+      setInRoomOwnerId(nextOwnerId);
+    },
+    [inRoomOwnerId, leaveVisitedRoomIfAny]
+  );
+
   // Live incoming knocks on YOUR door
   const [incomingKnocks, setIncomingKnocks] = useState<RoomKnockDTO[]>([]);
   const [knocksOpen, setKnocksOpen] = useState(false);
@@ -192,6 +224,7 @@ export default function DomusApp() {
   }
 
   async function handleDemoRoleSwitch(memberId: string) {
+    await leaveVisitedRoomIfAny(inRoomOwnerId);
     await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -202,6 +235,7 @@ export default function DomusApp() {
   }
 
   async function handleLogout() {
+    await leaveVisitedRoomIfAny(inRoomOwnerId);
     await fetch("/api/auth/logout", { method: "POST" });
     setInRoomOwnerId(null);
     await loadSession();
@@ -262,7 +296,7 @@ export default function DomusApp() {
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
-              onClick={() => setInRoomOwnerId(null)}
+              onClick={() => void navigateRoom(null)}
               title="Back to Common Area"
               className="flex shrink-0 items-center gap-2.5 text-left"
             >
@@ -494,7 +528,7 @@ export default function DomusApp() {
             {/* Quick shortcut into Your Own Room */}
             <button
               type="button"
-              onClick={() => setInRoomOwnerId(currentMember.id)}
+              onClick={() => void navigateRoom(currentMember.id)}
               className="flex shrink-0 items-center gap-2 text-left"
               title={`Open ${currentMember.name}'s Room`}
             >
@@ -535,7 +569,7 @@ export default function DomusApp() {
             >
               <button
                 type="button"
-                onClick={() => setInRoomOwnerId(null)}
+                onClick={() => void navigateRoom(null)}
                 className="domus-btn-secondary text-xs"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
@@ -546,7 +580,7 @@ export default function DomusApp() {
                 currentMember={currentMember}
                 roomOwnerId={inRoomOwnerId}
                 members={session.members}
-                onReturnToMyRoom={() => setInRoomOwnerId(currentMember.id)}
+                onReturnToMyRoom={() => void navigateRoom(currentMember.id)}
                 onProfileChanged={loadSession}
               />
             </motion.div>
@@ -562,7 +596,7 @@ export default function DomusApp() {
                 currentMember={currentMember}
                 household={session.household}
                 members={session.members}
-                onEnterRoom={(ownerId) => setInRoomOwnerId(ownerId)}
+                onEnterRoom={(ownerId) => void navigateRoom(ownerId)}
                 onHouseholdChanged={loadSession}
                 onKnocksChanged={refreshKnocks}
               />

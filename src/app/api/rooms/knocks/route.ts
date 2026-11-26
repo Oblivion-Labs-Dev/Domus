@@ -119,3 +119,30 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json({ ok: true, status });
 }
+
+// Visitor exits a room they were let into — automatically re-locks the door behind them!
+export async function DELETE(request: Request) {
+  await ensureTables();
+  const visitor = await getCurrentMember();
+  if (!visitor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { searchParams } = new URL(request.url);
+  const roomOwnerId = searchParams.get("roomOwnerId");
+  if (!roomOwnerId || roomOwnerId === visitor.id) {
+    return NextResponse.json({ ok: true });
+  }
+
+  await db
+    .delete(roomKnocks)
+    .where(
+      and(
+        eq(roomKnocks.householdId, visitor.householdId),
+        eq(roomKnocks.visitorId, visitor.id),
+        eq(roomKnocks.roomOwnerId, roomOwnerId),
+        eq(roomKnocks.status, "ALLOWED")
+      )
+    );
+
+  return NextResponse.json({ ok: true });
+}

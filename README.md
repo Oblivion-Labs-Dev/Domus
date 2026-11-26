@@ -37,7 +37,7 @@ Most family apps force you to choose between rigid corporate project boards and 
         <li>Every family member has a 2.5D door in the Common Area hallway.</li>
         <li>Click your own door to step straight into your Private Room.</li>
         <li>Click another member's locked door to <strong>Knock Quietly (no note)</strong> or <strong>Knock with a Note</strong>.</li>
-        <li>Incoming knocks appear in the header bell &amp; room banner with 1-click <strong>Let In</strong>, <strong>Not Now</strong>, or <strong>Close Door</strong>.</li>
+        <li>Incoming knocks appear in the header bell &amp; room banner with 1-click <strong>Let In</strong>, <strong>Not Now</strong>, or <strong>Close Door</strong> — and locked doors automatically re-lock behind a visitor as soon as they exit.</li>
         <li>Head &amp; Co-Head can invite new members (Co-Head, Family Member, Guest / Helper) and copy both House Key &amp; Room Key in 1 click.</li>
       </ul>
     </td>
