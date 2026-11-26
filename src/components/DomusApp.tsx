@@ -266,8 +266,29 @@ export default function DomusApp() {
             />
           </div>
 
-          {/* Right Controls: Incoming Knocks + Demo Switcher + Avatar + Sign Out */}
+          {/* Right Controls: Paint Bucket + Incoming Knocks + Demo Switcher + Avatar + Sign Out */}
           <div className="relative flex shrink-0 items-center gap-2">
+            {/* 2.5D Paint Bucket — opens centered Wall Paint & Wallpaper Studio from anywhere in the house */}
+            <motion.button
+              type="button"
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setKnocksOpen(false);
+                setPaintModalOpen(true);
+              }}
+              title="Paint the house walls or upload a background"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-white/80 bg-[#f3ede4]/90 px-2.5 py-1.5 text-xs font-bold text-[#1e1916] shadow-sm transition hover:bg-white"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/paint-bucket-3d.png"
+                alt="House Wall Paint"
+                className="h-5 w-5 shrink-0 object-contain"
+              />
+              <span className="hidden md:inline">Paint</span>
+            </motion.button>
+
             {/* Incoming Knocks Bell (wrapped in absolute container so .domus-card NEVER stretches navbar!) */}
             <div className="relative">
               <button
@@ -467,7 +488,6 @@ export default function DomusApp() {
                 onEnterRoom={(ownerId) => setInRoomOwnerId(ownerId)}
                 onHouseholdChanged={loadSession}
                 onKnocksChanged={refreshKnocks}
-                onOpenWallPaint={() => setPaintModalOpen(true)}
               />
             </motion.div>
           )}

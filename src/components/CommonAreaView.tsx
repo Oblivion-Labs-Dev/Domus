@@ -41,7 +41,6 @@ interface CommonAreaViewProps {
   onEnterRoom: (memberId: string) => void;
   onHouseholdChanged: () => Promise<void>;
   onKnocksChanged: () => Promise<void>;
-  onOpenWallPaint: () => void;
 }
 
 function getListIconSrc(type: string): string {
@@ -55,7 +54,6 @@ export default function CommonAreaView({
   onEnterRoom,
   onHouseholdChanged,
   onKnocksChanged,
-  onOpenWallPaint,
 }: CommonAreaViewProps) {
   // Data
   const [lists, setLists] = useState<HouseholdListDTO[]>([]);
@@ -554,42 +552,20 @@ export default function CommonAreaView({
                 </h2>
               </div>
 
-              <div className="flex items-center gap-2">
-                {canInvite && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMintedMemberKeycard(null);
-                      setMemberError(null);
-                      setAddMemberOpen(true);
-                    }}
-                    className="domus-btn-secondary py-1.5 text-xs"
-                  >
-                    <UserPlus className="h-3.5 w-3.5 text-sage-700" />
-                    Add Member
-                  </button>
-                )}
-
-                {/* 2.5D Paint Bucket sitting right in the Common Room */}
-                <motion.button
+              {canInvite && (
+                <button
                   type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={onOpenWallPaint}
-                  title="Paint the house walls or upload a background"
-                  className="domus-tile group flex items-center gap-1.5 px-2.5 py-1.5 text-left"
+                  onClick={() => {
+                    setMintedMemberKeycard(null);
+                    setMemberError(null);
+                    setAddMemberOpen(true);
+                  }}
+                  className="domus-btn-secondary py-1.5 text-xs"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/assets/paint-bucket-3d.png"
-                    alt="House Wall Paint Bucket"
-                    className="h-7 w-7 shrink-0 object-contain transition-transform group-hover:scale-105"
-                  />
-                  <span className="text-[11px] font-extrabold text-[#1e1916]">
-                    Paint
-                  </span>
-                </motion.button>
-              </div>
+                  <UserPlus className="h-3.5 w-3.5 text-sage-700" />
+                  Add Member
+                </button>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2.5">
