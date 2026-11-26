@@ -10,7 +10,7 @@ import {
   roomConfigs,
 } from "@/db/schema";
 import { getCurrentMember, hashPassword, setSessionCookie } from "@/lib/auth";
-import { getAvatarPreset } from "@/lib/avatars";
+import { generateRoomKey, getAvatarPreset } from "@/lib/avatars";
 
 async function mintUniqueHouseKey(): Promise<string> {
   for (let i = 0; i < 10; i++) {
@@ -36,18 +36,18 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
 
   // CREATE A BRAND NEW HOUSE (User becomes Head of Household!)
+  // Automatically mints BOTH the House Key and the Head's personal Room Key.
   if (body.mode === "CREATE") {
     const residenceName = String(body.residenceName ?? "").trim();
     const name = String(body.name ?? "").trim();
     const email = String(body.email ?? "").trim().toLowerCase();
-    const roomKey = String(body.roomKey ?? "").trim();
     const avatarId = String(body.avatarId ?? "crown");
 
-    if (!residenceName || !name || !email || roomKey.length < 6) {
+    if (!residenceName || !name || !email) {
       return NextResponse.json(
         {
           error:
-            "Please provide a residence name, your name, email, and a Room Key (6+ chars).",
+            "Please provide a residence name, your name, and a recovery email.",
         },
         { status: 400 }
       );
@@ -67,6 +67,7 @@ export async function POST(request: Request) {
 
     const householdId = `hh_${crypto.randomUUID().slice(0, 8)}`;
     const houseKey = await mintUniqueHouseKey();
+    const roomKey = generateRoomKey();
     const memberId = `mem_${crypto.randomUUID().slice(0, 8)}`;
     const preset = getAvatarPreset(avatarId);
     const initials = name
@@ -171,6 +172,7 @@ export async function POST(request: Request) {
         householdId,
         residenceName: residenceName.slice(0, 64),
         houseKey,
+        roomKey,
         memberId,
       },
       { status: 201 }

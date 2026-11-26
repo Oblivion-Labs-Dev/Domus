@@ -33,11 +33,10 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
   const [houseIdentifier, setHouseIdentifier] = useState("");
   const [roomKey, setRoomKey] = useState("");
 
-  // Create House (Head of Household by default)
+  // Create House (Head of Household by default — House Key & Room Key are auto-minted!)
   const [residenceName, setResidenceName] = useState("");
   const [fullName, setFullName] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
-  const [newRoomKey, setNewRoomKey] = useState("");
   const [avatarId, setAvatarId] = useState("crown");
 
   // Recovery
@@ -55,7 +54,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
     roomKey: string;
     email: string;
   } | null>(null);
-  const [showCreatedRoomKey, setShowCreatedRoomKey] = useState(false);
+  const [showCreatedRoomKey, setShowCreatedRoomKey] = useState(true);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
@@ -67,7 +66,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
     setError(null);
     setRecoverResult(null);
     setCreatedKeycard(null);
-    setShowCreatedRoomKey(false);
+    setShowCreatedRoomKey(true);
     setCopiedField(null);
     setModalOpen(true);
   }
@@ -130,7 +129,6 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
           residenceName,
           name: fullName,
           email: recoveryEmail,
-          roomKey: newRoomKey,
           avatarId,
         }),
       });
@@ -139,11 +137,11 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
         setError(data.error ?? "Could not create your house.");
         return;
       }
-      // Show the minted House Key + Room Key Welcome Keycard before stepping inside!
+      // Show the auto-minted House Key + Room Key Welcome Keycard before stepping inside!
       setCreatedKeycard({
         residenceName: data.residenceName ?? residenceName,
         houseKey: data.houseKey,
-        roomKey: newRoomKey,
+        roomKey: data.roomKey,
         email: recoveryEmail,
       });
     } finally {
@@ -635,7 +633,8 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
                   <div>
                     <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                      House Name or House Key
+                      House Name or House Key{" "}
+                      <span className="text-terracotta-500">*</span>
                     </label>
                     <input
                       autoFocus
@@ -650,7 +649,8 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   <div>
                     <div className="mb-1.5 flex items-center justify-between">
                       <label className="text-xs font-bold text-[#4e433b]">
-                        Your Room Key
+                        Your Room Key{" "}
+                        <span className="text-terracotta-500">*</span>
                       </label>
                       <button
                         type="button"
@@ -709,7 +709,8 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
                   <div>
                     <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                      Name Your Residence
+                      Name Your Residence{" "}
+                      <span className="text-terracotta-500">*</span>
                     </label>
                     <input
                       autoFocus
@@ -724,7 +725,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <div>
                       <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                        Your Name
+                        Your Name <span className="text-terracotta-500">*</span>
                       </label>
                       <input
                         required
@@ -736,7 +737,8 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                        Recovery Email
+                        Recovery Email{" "}
+                        <span className="text-terracotta-500">*</span>
                       </label>
                       <input
                         type="email"
@@ -747,21 +749,6 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                         className="domus-input"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
-                      Set Your Room Key
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={newRoomKey}
-                      onChange={(e) => setNewRoomKey(e.target.value)}
-                      placeholder="At least 6 characters"
-                      className="domus-input"
-                    />
                   </div>
 
                   <div>
@@ -790,6 +777,12 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       ))}
                     </div>
                   </div>
+
+                  <p className="rounded-2xl bg-[#f3ece2] px-3.5 py-2.5 text-[11px] font-medium text-[#5c5047]">
+                    Domus automatically mints your <strong>House Key</strong>{" "}
+                    and your personal <strong>Room Key</strong> when you create
+                    your house.
+                  </p>
 
                   {error && (
                     <p className="rounded-2xl bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
@@ -821,15 +814,21 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     Enter the recovery email saved when your profile was
                     created.
                   </p>
-                  <input
-                    autoFocus
-                    type="email"
-                    required
-                    value={recoverEmail}
-                    onChange={(e) => setRecoverEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="domus-input"
-                  />
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                      Recovery Email{" "}
+                      <span className="text-terracotta-500">*</span>
+                    </label>
+                    <input
+                      autoFocus
+                      type="email"
+                      required
+                      value={recoverEmail}
+                      onChange={(e) => setRecoverEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="domus-input"
+                    />
+                  </div>
                   {recoverResult && (
                     <div className="space-y-2.5 rounded-2xl border border-sage-200 bg-sage-50 px-3.5 py-3 text-xs font-medium text-sage-900">
                       <p>{recoverResult.message}</p>
