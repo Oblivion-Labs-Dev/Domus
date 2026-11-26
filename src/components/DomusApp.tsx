@@ -11,16 +11,22 @@ import {
   Home,
   KeyRound,
   LogOut,
-  Paintbrush,
   Shield,
   X,
 } from "lucide-react";
-import { WALL_PAINTS, WallPaintId } from "@/lib/palettes";
+import {
+  applyWallPaintToDocument,
+  DEFAULT_WALL_PAINT,
+  loadWallPaintConfig,
+  saveAndApplyWallPaint,
+  WallPaintConfig,
+} from "@/lib/wallPaint";
 import { MemberContext, ROLE_META } from "@/lib/rbac";
 import CommonAreaView from "./CommonAreaView";
 import LoginView from "./LoginView";
 import MemberAvatar from "./MemberAvatar";
 import PersonalRoomView from "./PersonalRoomView";
+import WallPaintModal from "./WallPaintModal";
 import { HouseholdDTO, MemberDTO, RoomKnockDTO } from "./types";
 
 interface SessionState {
@@ -49,30 +55,22 @@ export default function DomusApp() {
   const [incomingKnocks, setIncomingKnocks] = useState<RoomKnockDTO[]>([]);
   const [knocksOpen, setKnocksOpen] = useState(false);
 
-  // Wall Paint selector
-  const [wallPaint, setWallPaint] = useState<WallPaintId>("plaster");
-  const [paintOpen, setPaintOpen] = useState(false);
+  // Wall Paint Studio state (triggered from the 2.5D Paint Bucket inside the Common Room!)
+  const [wallConfig, setWallConfig] =
+    useState<WallPaintConfig>(DEFAULT_WALL_PAINT);
+  const [paintModalOpen, setPaintModalOpen] = useState(false);
 
   const [copiedHouseKey, setCopiedHouseKey] = useState(false);
 
   useEffect(() => {
-    const saved =
-      typeof window !== "undefined"
-        ? (window.localStorage.getItem("domus_wall_paint") as WallPaintId | null)
-        : null;
-    const initial =
-      saved && WALL_PAINTS.some((p) => p.id === saved) ? saved : "plaster";
-    setWallPaint(initial);
-    document.documentElement.setAttribute("data-paint", initial);
+    const loaded = loadWallPaintConfig();
+    setWallConfig(loaded);
+    applyWallPaintToDocument(loaded);
   }, []);
 
-  function handleSelectPaint(next: WallPaintId) {
-    setWallPaint(next);
-    document.documentElement.setAttribute("data-paint", next);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("domus_wall_paint", next);
-    }
-    setPaintOpen(false);
+  function handleUpdateWallPaint(next: WallPaintConfig) {
+    setWallConfig(next);
+    saveAndApplyWallPaint(next);
   }
 
   const refreshKnocks = useCallback(async () => {
@@ -251,16 +249,13 @@ export default function DomusApp() {
             )}
           </div>
 
-          {/* Right Controls: Incoming Knocks + Wall Paint + Demo Switcher + Avatar + Sign Out */}
+          {/* Right Controls: Incoming Knocks + Demo Switcher + Avatar + Sign Out */}
           <div className="relative flex shrink-0 items-center gap-2">
-            {/* Incoming Knocks Bell */}
+            {/* Incoming Knocks Bell (wrapped in absolute container so .domus-card NEVER stretches navbar!) */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => {
-                  setKnocksOpen((v) => !v);
-                  setPaintOpen(false);
-                }}
+                onClick={() => setKnocksOpen((v) => !v)}
                 title="Door knocks on your room"
                 className={`relative inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
                   pendingKnocks.length > 0
@@ -277,140 +272,82 @@ export default function DomusApp() {
               </button>
 
               {knocksOpen && (
-                <div className="domus-card absolute right-0 top-11 z-50 w-80 space-y-3 p-4 text-[#1e1916] shadow-2xl">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold text-[#1e1916]">
-                      Knocks on Your Door
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setKnocksOpen(false)}
-                      className="rounded-lg p-1 text-[#6b5d53] hover:bg-black/5"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                <div className="absolute right-0 top-11 z-50 w-80">
+                  <div className="domus-card space-y-3 p-4 text-[#1e1916] shadow-2xl">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-[#1e1916]">
+                        Knocks on Your Door
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setKnocksOpen(false)}
+                        className="rounded-lg p-1 text-[#6b5d53] hover:bg-black/5"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
 
-                  {pendingKnocks.length === 0 ? (
-                    <p className="rounded-2xl bg-[#f3ede4] px-3 py-3 text-xs text-[#6b5d53]">
-                      Nobody is knocking on your door right now.
-                    </p>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {pendingKnocks.map((k) => {
-                        const visitor = memberById[k.visitorId];
-                        return (
-                          <div
-                            key={k.id}
-                            className="space-y-2.5 rounded-2xl bg-[#f3ede4] p-3"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <MemberAvatar
-                                initials={visitor?.avatarInitials ?? "?"}
-                                color={visitor?.color ?? "#d45a33"}
-                                avatarId={visitor?.avatarId}
-                                size="sm"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-[#1e1916]">
-                                  {visitor?.name ?? "Family Member"} knocked
-                                </p>
-                                {k.message ? (
-                                  <p className="mt-0.5 text-xs text-[#574c44]">
-                                    &ldquo;{k.message}&rdquo;
+                    {pendingKnocks.length === 0 ? (
+                      <p className="rounded-2xl bg-[#f3ede4] px-3 py-3 text-xs text-[#6b5d53]">
+                        Nobody is knocking on your door right now.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {pendingKnocks.map((k) => {
+                          const visitor = memberById[k.visitorId];
+                          return (
+                            <div
+                              key={k.id}
+                              className="space-y-2.5 rounded-2xl bg-[#f3ede4] p-3"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <MemberAvatar
+                                  initials={visitor?.avatarInitials ?? "?"}
+                                  color={visitor?.color ?? "#d45a33"}
+                                  avatarId={visitor?.avatarId}
+                                  size="sm"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold text-[#1e1916]">
+                                    {visitor?.name ?? "Family Member"} knocked
                                   </p>
-                                ) : (
-                                  <p className="mt-0.5 text-[11px] italic text-[#7c6e63]">
-                                    Knocked quietly (no note)
-                                  </p>
-                                )}
+                                  {k.message ? (
+                                    <p className="mt-0.5 text-xs text-[#574c44]">
+                                      &ldquo;{k.message}&rdquo;
+                                    </p>
+                                  ) : (
+                                    <p className="mt-0.5 text-[11px] italic text-[#7c6e63]">
+                                      Knocked quietly (no note)
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleRespondKnock(k.id, "ALLOWED")
+                                  }
+                                  className="domus-btn-accent flex-1 py-1.5 text-xs"
+                                >
+                                  <DoorOpen className="h-3.5 w-3.5" />
+                                  Let In
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleRespondKnock(k.id, "DECLINED")
+                                  }
+                                  className="domus-btn-secondary flex-1 py-1.5 text-xs"
+                                >
+                                  Not Now
+                                </button>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRespondKnock(k.id, "ALLOWED")
-                                }
-                                className="domus-btn-accent flex-1 py-1.5 text-xs"
-                              >
-                                <DoorOpen className="h-3.5 w-3.5" />
-                                Let In
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRespondKnock(k.id, "DECLINED")
-                                }
-                                className="domus-btn-secondary flex-1 py-1.5 text-xs"
-                              >
-                                Not Now
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Wall Paint Picker */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setPaintOpen((v) => !v);
-                  setKnocksOpen(false);
-                }}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
-                title="Change house wall paint"
-              >
-                <Paintbrush className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Wall Paint</span>
-              </button>
-
-              {paintOpen && (
-                <div className="domus-card absolute right-0 top-11 z-50 w-72 space-y-2.5 p-4 text-[#1e1916] shadow-2xl">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#6b5d53]">
-                      House Wall Paint
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setPaintOpen(false)}
-                      className="rounded-lg p-1 text-[#6b5d53] hover:bg-black/5"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="space-y-1.5">
-                    {WALL_PAINTS.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleSelectPaint(p.id)}
-                        className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition ${
-                          wallPaint === p.id
-                            ? "border-terracotta-500 bg-terracotta-50/70"
-                            : "border-stone-200/80 hover:border-stone-400"
-                        }`}
-                      >
-                        <div>
-                          <p className="text-xs font-bold text-[#1e1916]">
-                            {p.name}
-                          </p>
-                          <p className="text-[10px] text-[#6b5d53]">
-                            {p.description}
-                          </p>
-                        </div>
-                        <span
-                          className="h-6 w-6 shrink-0 rounded-full border-2 border-white shadow-sm"
-                          style={{ backgroundColor: p.swatch }}
-                        />
-                      </button>
-                    ))}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -513,11 +450,20 @@ export default function DomusApp() {
                 onEnterRoom={(ownerId) => setInRoomOwnerId(ownerId)}
                 onHouseholdChanged={loadSession}
                 onKnocksChanged={refreshKnocks}
+                onOpenWallPaint={() => setPaintModalOpen(true)}
               />
             </motion.div>
           )}
         </AnimatePresence>
       </main>
+
+      {/* Wall Paint & Wallpaper Studio Modal (opened by clicking the 2.5D Paint Bucket in the Common Room!) */}
+      <WallPaintModal
+        open={paintModalOpen}
+        config={wallConfig}
+        onChange={handleUpdateWallPaint}
+        onClose={() => setPaintModalOpen(false)}
+      />
     </div>
   );
 }

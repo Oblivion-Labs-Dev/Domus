@@ -41,6 +41,7 @@ interface CommonAreaViewProps {
   onEnterRoom: (memberId: string) => void;
   onHouseholdChanged: () => Promise<void>;
   onKnocksChanged: () => Promise<void>;
+  onOpenWallPaint: () => void;
 }
 
 const LIST_ICON_OPTIONS = [
@@ -78,6 +79,7 @@ export default function CommonAreaView({
   onEnterRoom,
   onHouseholdChanged,
   onKnocksChanged,
+  onOpenWallPaint,
 }: CommonAreaViewProps) {
   // Data
   const [lists, setLists] = useState<HouseholdListDTO[]>([]);
@@ -585,20 +587,47 @@ export default function CommonAreaView({
             })}
           </div>
 
-          {canInvite && (
-            <button
+          <div className="flex shrink-0 items-center gap-2.5">
+            {canInvite && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMintedMemberKeycard(null);
+                  setMemberError(null);
+                  setAddMemberOpen(true);
+                }}
+                className="domus-btn-secondary shrink-0 py-2 text-xs"
+              >
+                <UserPlus className="h-3.5 w-3.5 text-sage-700" />
+                Add Member
+              </button>
+            )}
+
+            {/* 2.5D Paint Bucket sitting right in the Common Room! */}
+            <motion.button
               type="button"
-              onClick={() => {
-                setMintedMemberKeycard(null);
-                setMemberError(null);
-                setAddMemberOpen(true);
-              }}
-              className="domus-btn-secondary shrink-0 py-2 text-xs"
+              whileHover={{ y: -3, rotate: -4, scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onOpenWallPaint}
+              title="Paint the house walls or upload a background"
+              className="domus-tile flex items-center gap-2 px-3 py-1.5 text-left"
             >
-              <UserPlus className="h-3.5 w-3.5 text-sage-700" />
-              Add Member
-            </button>
-          )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/paint-bucket-3d.png"
+                alt="House Wall Paint Bucket"
+                className="h-9 w-9 shrink-0 object-contain"
+              />
+              <div className="hidden sm:block">
+                <p className="text-[11px] font-extrabold leading-tight text-[#1e1916]">
+                  Wall Paint
+                </p>
+                <p className="text-[10px] font-medium text-[#6b5d53]">
+                  Colors &amp; patterns
+                </p>
+              </div>
+            </motion.button>
+          </div>
         </div>
       </section>
 
