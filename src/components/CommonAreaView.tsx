@@ -11,6 +11,7 @@ import {
   Copy,
   DoorClosed,
   DoorOpen,
+  Eraser,
   GripVertical,
   Hand,
   KeyRound,
@@ -215,6 +216,15 @@ export default function CommonAreaView({
       method: "DELETE",
     });
     await loadAll();
+  }
+
+  async function handleClearList(listId: string) {
+    setLists((prev) =>
+      prev.map((l) => (l.id === listId ? { ...l, items: [] } : l))
+    );
+    await fetch(`/api/lists/items?listId=${encodeURIComponent(listId)}`, {
+      method: "DELETE",
+    });
   }
 
   async function handleAddItem(e: React.FormEvent, listId: string) {
@@ -688,20 +698,20 @@ export default function CommonAreaView({
               </button>
             )}
 
-            {/* 2.5D Paint Bucket sitting right in the Common Room! */}
+            {/* 2.5D Paint Bucket sitting right in the Common Room (matching tile hover) */}
             <motion.button
               type="button"
-              whileHover={{ y: -3, rotate: -4, scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
               onClick={onOpenWallPaint}
               title="Paint the house walls or upload a background"
-              className="domus-tile flex items-center gap-2 px-3 py-1.5 text-left"
+              className="domus-tile group flex items-center gap-2 px-3 py-1.5 text-left"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/assets/paint-bucket-3d.png"
                 alt="House Wall Paint Bucket"
-                className="h-9 w-9 shrink-0 object-contain"
+                className="h-9 w-9 shrink-0 object-contain transition-transform group-hover:scale-105"
               />
               <div className="hidden sm:block">
                 <p className="text-[11px] font-extrabold leading-tight text-[#1e1916]">
@@ -915,14 +925,27 @@ export default function CommonAreaView({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteList(list.id)}
-                          title="Delete list"
-                          className="rounded-lg p-1 text-[#8a7c71] transition hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {list.items.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleClearList(list.id)}
+                              title="Clear all items in this list"
+                              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-[#7c6e63] transition hover:bg-[#efe7dc] hover:text-[#1e1916]"
+                            >
+                              <Eraser className="h-3 w-3" />
+                              Clear
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteList(list.id)}
+                            title="Delete list"
+                            className="rounded-lg p-1 text-[#8a7c71] transition hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Draggable Items (Silky pointer drag — never square!) */}

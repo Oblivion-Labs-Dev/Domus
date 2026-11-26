@@ -141,8 +141,23 @@ export async function DELETE(request: Request) {
   }
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
+  const listId = searchParams.get("listId");
+
+  // Clear all items in a list without deleting the list itself
+  if (listId) {
+    await db
+      .delete(listItems)
+      .where(
+        and(
+          eq(listItems.listId, listId),
+          eq(listItems.householdId, actor.householdId)
+        )
+      );
+    return NextResponse.json({ ok: true, cleared: true });
+  }
+
   if (!id) {
-    return NextResponse.json({ error: "Item id required" }, { status: 400 });
+    return NextResponse.json({ error: "Item id or listId required" }, { status: 400 });
   }
   await db
     .delete(listItems)
