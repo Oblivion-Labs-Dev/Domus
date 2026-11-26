@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Domus — Family Operating Hub",
+  title: "Domus — Your Family's Digital House",
   description:
-    "Lightweight household hub for overlapping schedules, time-booking, exercise & diet trackers, and shared lists with real family roles.",
+    "One calm, flexible digital space to organize life at home — shared when you want, private when you need.",
   manifest: "/manifest.json",
 };
 
@@ -15,9 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-stone-50 text-stone-900 antialiased">
-        {children}
-      </body>
+      <body className="min-h-screen antialiased">{children}</body>
     </html>
   );
 }

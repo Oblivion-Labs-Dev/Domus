@@ -28,7 +28,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
   const [houseIdentifier, setHouseIdentifier] = useState("");
   const [roomKey, setRoomKey] = useState("");
 
-  // Create House (you become Head of Household by default)
+  // Create House (Head of Household by default)
   const [residenceName, setResidenceName] = useState("");
   const [fullName, setFullName] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
@@ -132,56 +132,93 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-10">
-      {/* Rich architectural ambient lighting */}
+      {/* Dreamy Claymorphic 3D Floating Spheres (NO dots!) */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-24 -top-24 h-[30rem] w-[30rem] rounded-full bg-emerald-500/15 blur-3xl" />
-        <div className="absolute right-0 top-1/4 h-[32rem] w-[32rem] rounded-full bg-terracotta-500/18 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-amber-400/10 blur-3xl" />
+        <motion.div
+          animate={{ y: [0, -18, 0], x: [0, 10, 0] }}
+          transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -left-20 -top-20 h-80 w-80 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle at 30% 30%, #ffd8c4 0%, #f1a988 65%, #e0835c 100%)",
+            boxShadow:
+              "inset -16px -18px 36px rgba(176, 68, 30, 0.25), inset 12px 12px 26px rgba(255,255,255,0.7), 0 30px 60px rgba(217, 83, 47, 0.16)",
+            opacity: 0.55,
+          }}
+        />
+        <motion.div
+          animate={{ y: [0, 20, 0], x: [0, -12, 0] }}
+          transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -right-24 bottom-8 h-96 w-96 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle at 30% 30%, #d4eee0 0%, #8fc4a8 65%, #5b9978 100%)",
+            boxShadow:
+              "inset -18px -20px 40px rgba(32, 74, 54, 0.22), inset 14px 14px 30px rgba(255,255,255,0.7), 0 30px 60px rgba(59, 110, 82, 0.16)",
+            opacity: 0.55,
+          }}
+        />
+        <motion.div
+          animate={{ y: [0, -14, 0] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute left-1/2 top-16 h-44 w-44 -translate-x-1/2 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle at 32% 32%, #fff3d1 0%, #f6d488 70%, #e5b352 100%)",
+            boxShadow:
+              "inset -10px -12px 24px rgba(180, 120, 20, 0.2), inset 8px 8px 18px rgba(255,255,255,0.8)",
+            opacity: 0.48,
+          }}
+        />
       </div>
 
       <div className="mx-auto max-w-6xl">
-        {/* Clean Minimal Top Bar */}
+        {/* Clean Claymorphic Top Bar */}
         <motion.header
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-10 flex flex-wrap items-center justify-between gap-4"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             <motion.div
-              whileHover={{ rotate: -5, y: -2 }}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-terracotta-500 text-white shadow-lg"
+              whileHover={{ rotate: -6, y: -3, scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex h-12 w-12 items-center justify-center rounded-2xl text-white"
               style={{
+                background: "linear-gradient(145deg, #ec704b 0%, #cf4e2a 100%)",
                 boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 0 0 #8f3216, 0 12px 24px -8px rgba(217,83,47,0.5)",
+                  "0 12px 22px -6px rgba(217, 83, 47, 0.45), inset 0 2px 4px rgba(255,255,255,0.45), inset 0 -5px 8px rgba(143,44,18,0.4)",
               }}
             >
               <Home className="h-5 w-5" />
             </motion.div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-[#f7f4ee]">
+              <h1 className="text-xl font-bold tracking-tight text-[#1e1916]">
                 Domus
               </h1>
-              <p className="text-[11px] font-medium text-[#9ec0b2]">
+              <p className="text-[11px] font-semibold text-[#6b5d53]">
                 Oblivion Labs
               </p>
             </div>
           </div>
 
-          <button
+          <motion.button
             type="button"
+            whileHover={{ y: -2, scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
             disabled={demoLoading}
             onClick={handleEnterDemo}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-[#f7f4ee] backdrop-blur-md transition hover:bg-white/20 disabled:opacity-50"
+            className="domus-btn-secondary py-2.5 text-xs"
           >
-            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-            {demoLoading ? "Preparing Demo House..." : "Explore Live Demo"}
+            <Sparkles className="h-3.5 w-3.5 text-terracotta-500" />
+            {demoLoading ? "Opening Demo House..." : "Explore Live Demo"}
             <ArrowRight className="h-3.5 w-3.5" />
-          </button>
+          </motion.button>
         </motion.header>
 
-        {/* Main 2-Column Hero */}
+        {/* Main 2-Column Claymorphic Hero */}
         <div className="grid items-center gap-10 lg:grid-cols-12">
-          {/* Left 7 Cols: Timeless Headline + Uncropped 2.5D House Centerpiece */}
+          {/* Left 7 Cols: Timeless Headline + Seamless 2.5D House Centerpiece */}
           <div className="space-y-7 lg:col-span-7">
             <motion.div
               initial={{ opacity: 0, y: 14 }}
@@ -189,64 +226,58 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
               transition={{ delay: 0.04 }}
               className="space-y-3"
             >
-              <h2 className="text-4xl font-bold leading-[1.12] tracking-tight text-[#faf8f3] sm:text-5xl">
+              <h2 className="text-4xl font-extrabold leading-[1.1] tracking-tight text-[#1d1714] sm:text-5xl">
                 Build your family&apos;s digital house.
               </h2>
-              <p className="max-w-xl text-base leading-relaxed text-[#bdd4c9]">
-                One calm, flexible space to organize life at home — shared when
+              <p className="max-w-xl text-base leading-relaxed text-[#574c44]">
+                One warm, flexible space to organize life at home — shared when
                 you want, private when you need, shaped entirely by the people
                 who live in it.
               </p>
             </motion.div>
 
-            {/* Uncropped 2.5D House Centerpiece */}
+            {/* Seamless Claymorphic 2.5D House Pedestal (ZERO square seam!) */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.1, type: "spring", stiffness: 220 }}
             >
               <TiltCard
-                maxTilt={4}
-                lift={5}
-                glowColor="rgba(217, 83, 47, 0.12)"
-                className="overflow-hidden bg-[#faf9f5] p-5 sm:p-7"
+                maxTilt={5}
+                lift={6}
+                glowColor="rgba(224, 93, 56, 0.14)"
+                className="overflow-hidden p-6 sm:p-8"
               >
                 <div className="flex flex-col items-center">
-                  {/* Full, uncropped 2.5D isometric house diorama */}
+                  {/* Seamless blend so the 2.5D house floats directly on the clay surface */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/assets/house-hero.png"
                     alt="Domus Digital House"
-                    className="max-h-[340px] w-full object-contain drop-shadow-sm"
+                    className="max-h-[340px] w-full object-contain mix-blend-multiply"
                   />
                 </div>
 
-                {/* Subtle architectural pillars */}
-                <div className="mt-5 grid grid-cols-3 gap-3 border-t border-stone-200/70 pt-4 text-center">
-                  <div>
-                    <p className="text-xs font-bold text-[#132a21]">
-                      Common Space
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-stone-500">
-                      For the whole home
-                    </p>
-                  </div>
-                  <div className="border-x border-stone-200/70 px-2">
-                    <p className="text-xs font-bold text-[#132a21]">
-                      Private Rooms
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-stone-500">
-                      Yours to arrange
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-[#132a21]">
-                      Real Roles
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-stone-500">
-                      Keys &amp; permissions
-                    </p>
-                  </div>
+                {/* 3 Tactile Claymorphic Pillars */}
+                <div className="mt-6 grid grid-cols-3 gap-3">
+                  {[
+                    { title: "Common Space", sub: "For the whole home" },
+                    { title: "Private Rooms", sub: "Yours to arrange" },
+                    { title: "Real Roles", sub: "Keys & permissions" },
+                  ].map((item) => (
+                    <motion.div
+                      key={item.title}
+                      whileHover={{ y: -3 }}
+                      className="domus-tile px-3 py-3 text-center"
+                    >
+                      <p className="text-xs font-bold text-[#1e1916]">
+                        {item.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-[#6b5d53]">
+                        {item.sub}
+                      </p>
+                    </motion.div>
+                  ))}
                 </div>
               </TiltCard>
             </motion.div>
@@ -259,9 +290,14 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             transition={{ delay: 0.14 }}
             className="lg:col-span-5"
           >
-            <TiltCard maxTilt={3} lift={3} className="space-y-5 p-6 sm:p-7">
-              {/* Strictly 2 Tabs */}
-              <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-stone-100 p-1.5 text-xs font-bold">
+            <TiltCard maxTilt={3.5} lift={4} className="space-y-5 p-6 sm:p-7">
+              {/* Strictly 2 Claymorphic Tabs */}
+              <div
+                className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[#efe7dc] p-1.5 text-xs font-bold"
+                style={{
+                  boxShadow: "inset 0 3px 6px rgba(74, 52, 38, 0.1)",
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -269,10 +305,10 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     setError(null);
                     setRecoverResult(null);
                   }}
-                  className={`rounded-xl py-2.5 transition ${
+                  className={`rounded-xl py-2.5 transition-all ${
                     mode === "ENTER" || mode === "RECOVER"
-                      ? "bg-[#163029] text-white shadow-sm"
-                      : "text-stone-600 hover:text-stone-900"
+                      ? "bg-[#1f332b] text-white shadow-md"
+                      : "text-[#5c5047] hover:text-[#1e1916]"
                   }`}
                 >
                   Enter House
@@ -284,10 +320,10 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     setError(null);
                     setRecoverResult(null);
                   }}
-                  className={`rounded-xl py-2.5 transition ${
+                  className={`rounded-xl py-2.5 transition-all ${
                     mode === "CREATE"
-                      ? "bg-[#163029] text-white shadow-sm"
-                      : "text-stone-600 hover:text-stone-900"
+                      ? "bg-[#1f332b] text-white shadow-md"
+                      : "text-[#5c5047] hover:text-[#1e1916]"
                   }`}
                 >
                   Create House
@@ -298,19 +334,21 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
               {mode === "ENTER" && (
                 <form onSubmit={handleEnterHouse} className="space-y-4">
                   <div className="flex items-center gap-2.5">
-                    <DoorOpen className="h-4 w-4 text-terracotta-500" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-terracotta-100 text-terracotta-600">
+                      <DoorOpen className="h-4 w-4" />
+                    </div>
                     <div>
-                      <h3 className="text-sm font-bold text-stone-900">
+                      <h3 className="text-sm font-bold text-[#1e1916]">
                         Unlock Your Residence
                       </h3>
-                      <p className="text-[11px] text-stone-500">
-                        Your Room Key automatically recognizes who you are.
+                      <p className="text-[11px] text-[#6b5d53]">
+                        Your key automatically recognizes who you are.
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
                       House Name or House Key
                     </label>
                     <input
@@ -323,8 +361,8 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <label className="text-xs font-semibold text-stone-600">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <label className="text-xs font-bold text-[#4e433b]">
                         Your Room Key
                       </label>
                       <button
@@ -333,7 +371,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                           setMode("RECOVER");
                           setError(null);
                         }}
-                        className="text-[11px] font-semibold text-terracotta-600 hover:underline"
+                        className="text-[11px] font-bold text-terracotta-600 hover:underline"
                       >
                         Forgot key?
                       </button>
@@ -349,7 +387,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   {error && (
-                    <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                    <p className="rounded-2xl bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
                       {error}
                     </p>
                   )}
@@ -357,7 +395,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="domus-btn-primary w-full py-2.5"
+                    className="domus-btn-accent w-full py-3"
                   >
                     <Lock className="h-4 w-4" />
                     {loading ? "Unlocking..." : "Enter Residence"}
@@ -368,21 +406,22 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
               {/* WAY 2: CREATE A NEW HOUSE (Head of Household by default) */}
               {mode === "CREATE" && (
                 <form onSubmit={handleCreateHouse} className="space-y-3.5">
-                  <div className="flex items-center gap-2">
-                    <PlusCircle className="h-4 w-4 text-terracotta-500" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sage-100 text-sage-700">
+                      <PlusCircle className="h-4 w-4" />
+                    </div>
                     <div>
-                      <h3 className="text-sm font-bold text-stone-900">
+                      <h3 className="text-sm font-bold text-[#1e1916]">
                         Create Your Digital House
                       </h3>
-                      <p className="text-[11px] text-stone-500">
-                        You start as Head of Household and can add family
-                        members inside.
+                      <p className="text-[11px] text-[#6b5d53]">
+                        You start as Head of Household and invite family inside.
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
+                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
                       Name Your Residence
                     </label>
                     <input
@@ -396,19 +435,19 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-stone-600">
+                      <label className="mb-1 block text-xs font-bold text-[#4e433b]">
                         Your Name
                       </label>
                       <input
                         required
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Head of family name"
+                        placeholder="Head of family"
                         className="domus-input"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-stone-600">
+                      <label className="mb-1 block text-xs font-bold text-[#4e433b]">
                         Recovery Email
                       </label>
                       <input
@@ -423,7 +462,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-stone-600">
+                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
                       Set Your Room Key
                     </label>
                     <input
@@ -438,7 +477,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-stone-600">
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
                       Choose Your Avatar
                     </label>
                     <div className="flex flex-wrap gap-1.5">
@@ -449,7 +488,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                           onClick={() => setAvatarId(av.id)}
                           className={`rounded-full p-0.5 transition ${
                             avatarId === av.id
-                              ? "ring-2 ring-[#163029]"
+                              ? "ring-2 ring-[#1f332b]"
                               : "opacity-75 hover:opacity-100"
                           }`}
                         >
@@ -465,7 +504,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   {error && (
-                    <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                    <p className="rounded-2xl bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
                       {error}
                     </p>
                   )}
@@ -473,7 +512,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="domus-btn-accent w-full py-2.5"
+                    className="domus-btn-accent w-full py-3"
                   >
                     <KeyRound className="h-4 w-4" />
                     {loading ? "Creating..." : "Create House"}
@@ -486,11 +525,11 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                 <form onSubmit={handleRecover} className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-terracotta-500" />
-                    <h3 className="text-sm font-bold text-stone-900">
+                    <h3 className="text-sm font-bold text-[#1e1916]">
                       Find Your House &amp; Key
                     </h3>
                   </div>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-[#6b5d53]">
                     Enter the recovery email saved when your profile was
                     created.
                   </p>
@@ -503,12 +542,12 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     className="domus-input"
                   />
                   {recoverResult && (
-                    <p className="rounded-xl border border-sage-200 bg-sage-50 px-3 py-2 text-xs font-medium text-sage-800">
+                    <p className="rounded-2xl border border-sage-200 bg-sage-50 px-3.5 py-2.5 text-xs font-semibold text-sage-800">
                       {recoverResult}
                     </p>
                   )}
                   {error && (
-                    <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                    <p className="rounded-2xl bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
                       {error}
                     </p>
                   )}
@@ -531,7 +570,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                 </form>
               )}
 
-              <div className="flex items-center justify-center gap-1.5 border-t border-stone-100 pt-3 text-[11px] text-stone-400">
+              <div className="flex items-center justify-center gap-1.5 border-t border-stone-200/70 pt-3 text-[11px] font-medium text-[#7c6e63]">
                 <ShieldCheck className="h-3.5 w-3.5 text-sage-600" />
                 <span>Encrypted Room Keys · Signed HTTP-only sessions</span>
               </div>
