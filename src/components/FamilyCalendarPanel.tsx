@@ -30,6 +30,7 @@ interface FamilyCalendarPanelProps {
   onRefresh: () => Promise<void>;
   personalOnly?: boolean;
   ownerName?: string;
+  className?: string;
 }
 
 interface UnifiedCalEntry {
@@ -96,6 +97,7 @@ export default function FamilyCalendarPanel({
   onRefresh,
   personalOnly = false,
   ownerName,
+  className = "lg:sticky lg:top-20 lg:col-span-5",
 }: FamilyCalendarPanelProps) {
   const [view, setView] = useState<"MONTH" | "WEEK" | "DAY">("MONTH");
   const [scope, setScope] = useState<"ALL" | "MINE">(
@@ -453,7 +455,7 @@ export default function FamilyCalendarPanel({
   const HOURS = Array.from({ length: 17 }, (_, i) => i + 6); // 6 AM .. 10 PM
 
   return (
-    <section className="domus-card p-4 sm:p-5 lg:sticky lg:top-20 lg:col-span-5">
+    <section className={`domus-card p-4 sm:p-5 ${className}`}>
       {/* Top Header */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">

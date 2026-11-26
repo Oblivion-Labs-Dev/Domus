@@ -68,7 +68,6 @@ export default function CommonAreaView({
   const [loading, setLoading] = useState(true);
 
   // Shared Lists UI
-  const [newListOpen, setNewListOpen] = useState(false);
   const [newListTitle, setNewListTitle] = useState("");
   const [newListIcon, setNewListIcon] = useState("/assets/decor-groceries.png");
   const [draftItems, setDraftItems] = useState<
@@ -181,7 +180,6 @@ export default function CommonAreaView({
     });
     if (res.ok) {
       setNewListTitle("");
-      setNewListOpen(false);
       await loadAll();
     }
   }
@@ -537,267 +535,259 @@ export default function CommonAreaView({
   ).length;
 
   return (
-    <div className="space-y-4 pb-6">
-      {/* TOP COMPACT HALLWAY STRIP: FAMILY DOORS */}
-      <section className="domus-card px-4 py-3.5 sm:px-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="mr-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-terracotta-600">
-                Hallway
-              </p>
-              <h2 className="text-sm font-extrabold tracking-tight text-[#1e1916]">
-                Family Doors
-              </h2>
-            </div>
+    <div className="space-y-5 pb-8">
+      {/* TOP BALANCED WORKSPACE (Fits 1 viewport cleanly, NEVER lopsided!):
+          Left 5 cols: Family Doors + Paint Bucket + Create Shared List
+          Right 7 cols: Spacious Multi-View Family Calendar */}
+      <div className="grid items-stretch gap-5 lg:grid-cols-12">
+        {/* LEFT 5 COLS: HALLWAY DOORS + ALWAYS-READY LIST CREATOR */}
+        <div className="flex flex-col gap-4 lg:col-span-5">
+          {/* Family Doors & Paint Bucket */}
+          <section className="domus-card flex flex-col gap-3.5 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-terracotta-600">
+                  Hallway
+                </p>
+                <h2 className="text-base font-extrabold tracking-tight text-[#1e1916]">
+                  Family Doors
+                </h2>
+              </div>
 
-            {members.map((m) => {
-              const isMe = m.id === currentMember.id;
-              const isPublic = publicRoomOwners.has(m.id);
-              const myKnock = outgoingKnocks.find(
-                (k) => k.roomOwnerId === m.id
-              );
-              const canEnterDirectly =
-                isMe || isPublic || myKnock?.status === "ALLOWED";
+              <div className="flex items-center gap-2">
+                {canInvite && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMintedMemberKeycard(null);
+                      setMemberError(null);
+                      setAddMemberOpen(true);
+                    }}
+                    className="domus-btn-secondary py-1.5 text-xs"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 text-sage-700" />
+                    Add Member
+                  </button>
+                )}
 
-              return (
+                {/* 2.5D Paint Bucket sitting right in the Common Room */}
                 <motion.button
-                  key={m.id}
                   type="button"
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    if (canEnterDirectly) {
-                      onEnterRoom(m.id);
-                    } else {
-                      setKnockTarget(m);
-                      setKnockMessage("");
-                    }
-                  }}
-                  className="domus-tile group flex items-center gap-2.5 px-3 py-2 text-left"
+                  onClick={onOpenWallPaint}
+                  title="Paint the house walls or upload a background"
+                  className="domus-tile group flex items-center gap-1.5 px-2.5 py-1.5 text-left"
                 >
-                  <div className="relative flex shrink-0 items-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/assets/door-3d.png"
-                      alt={`${m.name}'s door`}
-                      className="h-9 w-9 object-contain mix-blend-multiply transition-transform group-hover:scale-105"
-                    />
-                    <div className="absolute -bottom-0.5 -right-1 rounded-full ring-2 ring-[#faf7f2]">
-                      <MemberAvatar
-                        initials={m.avatarInitials}
-                        color={m.color}
-                        avatarId={m.avatarId}
-                        size="sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 pr-1">
-                    <p className="text-xs font-extrabold leading-tight text-[#1e1916]">
-                      {m.name}
-                    </p>
-                    <span
-                      className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                        isMe
-                          ? "bg-[#1f332b] text-white"
-                          : canEnterDirectly
-                          ? "bg-sage-100 text-sage-800"
-                          : myKnock?.status === "KNOCKING"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-[#e7dfd4] text-[#5c5047]"
-                      }`}
-                    >
-                      {isMe ? (
-                        pendingIncomingCount > 0 ? (
-                          `${pendingIncomingCount} Knocking`
-                        ) : (
-                          "My Room"
-                        )
-                      ) : canEnterDirectly ? (
-                        <>
-                          <DoorOpen className="h-2.5 w-2.5" /> Open
-                        </>
-                      ) : myKnock?.status === "KNOCKING" ? (
-                        "Knocking..."
-                      ) : (
-                        <>
-                          <DoorClosed className="h-2.5 w-2.5" /> Knock
-                        </>
-                      )}
-                    </span>
-                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/assets/paint-bucket-3d.png"
+                    alt="House Wall Paint Bucket"
+                    className="h-7 w-7 shrink-0 object-contain transition-transform group-hover:scale-105"
+                  />
+                  <span className="text-[11px] font-extrabold text-[#1e1916]">
+                    Paint
+                  </span>
                 </motion.button>
-              );
-            })}
-          </div>
+              </div>
+            </div>
 
-          <div className="flex shrink-0 items-center gap-2.5">
-            {canInvite && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMintedMemberKeycard(null);
-                  setMemberError(null);
-                  setAddMemberOpen(true);
-                }}
-                className="domus-btn-secondary shrink-0 py-2 text-xs"
-              >
-                <UserPlus className="h-3.5 w-3.5 text-sage-700" />
-                Add Member
-              </button>
-            )}
+            <div className="flex flex-wrap gap-2.5">
+              {members.map((m) => {
+                const isMe = m.id === currentMember.id;
+                const isPublic = publicRoomOwners.has(m.id);
+                const myKnock = outgoingKnocks.find(
+                  (k) => k.roomOwnerId === m.id
+                );
+                const canEnterDirectly =
+                  isMe || isPublic || myKnock?.status === "ALLOWED";
 
-            {/* 2.5D Paint Bucket sitting right in the Common Room (matching tile hover) */}
-            <motion.button
-              type="button"
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onOpenWallPaint}
-              title="Paint the house walls or upload a background"
-              className="domus-tile group flex items-center gap-2 px-3 py-1.5 text-left"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/assets/paint-bucket-3d.png"
-                alt="House Wall Paint Bucket"
-                className="h-9 w-9 shrink-0 object-contain transition-transform group-hover:scale-105"
-              />
-              <div className="hidden sm:block">
-                <p className="text-[11px] font-extrabold leading-tight text-[#1e1916]">
-                  Wall Paint
-                </p>
-                <p className="text-[10px] font-medium text-[#6b5d53]">
-                  Colors &amp; patterns
+                return (
+                  <motion.button
+                    key={m.id}
+                    type="button"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      if (canEnterDirectly) {
+                        onEnterRoom(m.id);
+                      } else {
+                        setKnockTarget(m);
+                        setKnockMessage("");
+                      }
+                    }}
+                    className="domus-tile group flex items-center gap-2.5 px-3 py-2 text-left"
+                  >
+                    <div className="relative flex shrink-0 items-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/assets/door-3d.png"
+                        alt={`${m.name}'s door`}
+                        className="h-9 w-9 object-contain mix-blend-multiply transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute -bottom-0.5 -right-1 rounded-full ring-2 ring-[#faf7f2]">
+                        <MemberAvatar
+                          initials={m.avatarInitials}
+                          color={m.color}
+                          avatarId={m.avatarId}
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="min-w-0 pr-1">
+                      <p className="text-xs font-extrabold leading-tight text-[#1e1916]">
+                        {m.name}
+                      </p>
+                      <span
+                        className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                          isMe
+                            ? "bg-[#1f332b] text-white"
+                            : canEnterDirectly
+                            ? "bg-sage-100 text-sage-800"
+                            : myKnock?.status === "KNOCKING"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-[#e7dfd4] text-[#5c5047]"
+                        }`}
+                      >
+                        {isMe ? (
+                          pendingIncomingCount > 0 ? (
+                            `${pendingIncomingCount} Knocking`
+                          ) : (
+                            "My Room"
+                          )
+                        ) : canEnterDirectly ? (
+                          <>
+                            <DoorOpen className="h-2.5 w-2.5" /> Open
+                          </>
+                        ) : myKnock?.status === "KNOCKING" ? (
+                          "Knocking..."
+                        ) : (
+                          <>
+                            <DoorClosed className="h-2.5 w-2.5" /> Knock
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Always-Ready Shared List Creator (sits cleanly beside the Calendar!) */}
+          <form
+            onSubmit={handleCreateList}
+            className="domus-card flex flex-1 flex-col justify-between gap-3.5 p-4 sm:p-5"
+          >
+            <div className="space-y-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-extrabold tracking-tight text-[#1e1916]">
+                  <ListChecks className="h-4 w-4 text-terracotta-500" />
+                  Create a Shared List
+                </h2>
+                <p className="text-[11px] text-[#6b5d53]">
+                  Start any list for the whole home — lists appear in a
+                  full-width grid below.
                 </p>
               </div>
-            </motion.button>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                  List Name <span className="text-terracotta-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    required
+                    value={newListTitle}
+                    onChange={(e) => setNewListTitle(e.target.value)}
+                    placeholder="e.g., Weekly Groceries, Meal Prep, Birthdays..."
+                    className="domus-input py-2 text-xs"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newListTitle.trim()}
+                    className="domus-btn-accent shrink-0 px-4 py-2 text-xs disabled:opacity-45"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              <MiniaturePicker
+                value={newListIcon}
+                label="Quick Pick or 2.5D Icon (20 Miniatures)"
+                compactCount={6}
+                onSelect={(mini) => {
+                  setNewListIcon(mini.src);
+                  const presetLabels = CLAY_MINIATURES.map((o) => o.label);
+                  if (
+                    !newListTitle.trim() ||
+                    presetLabels.includes(newListTitle.trim())
+                  ) {
+                    setNewListTitle(mini.label);
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-[#e8dfd3] pt-2.5 text-[11px] font-semibold text-[#6b5d53]">
+              <span>
+                {lists.length} shared {lists.length === 1 ? "list" : "lists"} in
+                this house
+              </span>
+              <span>Drag items between lists below</span>
+            </div>
+          </form>
+        </div>
+
+        {/* RIGHT 7 COLS: SPACIOUS FAMILY & PERSONAL CALENDAR */}
+        <FamilyCalendarPanel
+          currentMember={currentMember}
+          members={members}
+          events={events}
+          lists={lists}
+          onRefresh={loadAll}
+          className="lg:col-span-7"
+        />
+      </div>
+
+      {/* BOTTOM FULL-WIDTH SYMMETRICAL GRID: SHARED FAMILY LISTS (Grows evenly across 3-4 columns!) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-[#1e1916]">
+              <ListChecks className="h-4 w-4 text-terracotta-500" />
+              Shared Family Lists
+            </h2>
+            <p className="text-[11px] text-[#6b5d53]">
+              Drag items across any list, check them off, clear a list to reuse
+              it, or click the calendar icon to schedule.
+            </p>
           </div>
         </div>
-      </section>
 
-      {/* MAIN SIDE-BY-SIDE BENTO WORKSPACE: SHARED LISTS (LEFT) + FAMILY CALENDAR (RIGHT) */}
-      <div className="grid items-start gap-5 lg:grid-cols-12">
-        {/* LEFT 7 COLS: UNRESTRICTED SHARED FAMILY LISTS */}
-        <section className="space-y-4 lg:col-span-7">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-[#1e1916]">
-                <ListChecks className="h-4 w-4 text-terracotta-500" />
-                Shared Family Lists
-              </h2>
-              <p className="text-[11px] text-[#6b5d53]">
-                Drag items between lists, check them off, or add a date to sync
-                to the calendar.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setNewListOpen((v) => !v)}
-              className="domus-btn-accent py-2 text-xs"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New List
-            </button>
+        {loading ? (
+          <div className="domus-card p-6 text-center text-xs text-[#6b5d53]">
+            Loading shared lists...
           </div>
-
-          {/* Inline New List Creator */}
-          <AnimatePresence>
-            {newListOpen && (
-              <motion.form
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                onSubmit={handleCreateList}
-                className="domus-card space-y-3.5 p-4 sm:p-5"
-              >
-                <div className="flex flex-wrap items-end gap-2.5">
-                  <div className="min-w-[200px] flex-1">
-                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
-                      List Name <span className="text-terracotta-500">*</span>
-                    </label>
-                    <input
-                      autoFocus
-                      required
-                      value={newListTitle}
-                      onChange={(e) => setNewListTitle(e.target.value)}
-                      placeholder="e.g., Groceries, Meal Prep, Relative Birthdays..."
-                      className="domus-input py-2 text-xs"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewListOpen(false);
-                        setNewListTitle("");
-                      }}
-                      className="domus-btn-secondary py-2 text-xs"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="domus-btn-accent py-2 text-xs"
-                    >
-                      Create
-                    </button>
-                  </div>
-                </div>
-
-                <MiniaturePicker
-                  value={newListIcon}
-                  label="Quick Pick or 2.5D Icon (20 Miniatures)"
-                  compactCount={8}
-                  onSelect={(mini) => {
-                    setNewListIcon(mini.src);
-                    const presetLabels = CLAY_MINIATURES.map((o) => o.label);
-                    if (
-                      !newListTitle.trim() ||
-                      presetLabels.includes(newListTitle.trim())
-                    ) {
-                      setNewListTitle(mini.label);
-                    }
-                  }}
-                />
-              </motion.form>
-            )}
-          </AnimatePresence>
-
-          {/* Lists Grid (2 cols on sm+) */}
-          {loading ? (
-            <div className="domus-card p-6 text-center text-xs text-[#6b5d53]">
-              Loading shared lists...
-            </div>
-          ) : lists.length === 0 ? (
-            <div className="domus-card flex flex-col items-center justify-center gap-3 p-8 text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/assets/board-3d.png"
-                alt="Shared lists"
-                className="h-16 w-16 object-contain mix-blend-multiply"
-              />
-              <div>
-                <h3 className="text-sm font-bold text-[#1e1916]">
-                  No shared lists yet
-                </h3>
-                <p className="mt-1 max-w-xs text-xs text-[#6b5d53]">
-                  Create any list for the whole house — groceries, meal prep,
-                  errands, or birthdays.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setNewListOpen(true)}
-                className="domus-btn-accent py-2 text-xs"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Create First List
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+        ) : lists.length === 0 ? (
+          <div className="domus-card flex flex-wrap items-center justify-center gap-3 p-6 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/board-3d.png"
+              alt="Shared lists"
+              className="h-12 w-12 object-contain mix-blend-multiply"
+            />
+            <p className="text-xs font-medium text-[#6b5d53]">
+              No shared lists yet — create your first one in the{" "}
+              <strong className="text-[#1e1916]">Create a Shared List</strong>{" "}
+              card above!
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {lists.map((list) => {
                 const draft = draftItems[list.id] ?? { title: "", dueDate: "" };
                 const isDropTarget =
@@ -1042,17 +1032,7 @@ export default function CommonAreaView({
               })}
             </div>
           )}
-        </section>
-
-        {/* RIGHT 5 COLS: MULTI-VIEW FAMILY & PERSONAL CALENDAR (Month | Week | Day + Day Detail Sheet + Participant Sync) */}
-        <FamilyCalendarPanel
-          currentMember={currentMember}
-          members={members}
-          events={events}
-          lists={lists}
-          onRefresh={loadAll}
-        />
-      </div>
+      </section>
 
       {/* MODAL 1: KNOCK ON A FAMILY MEMBER'S DOOR (Quiet Knock OR With Message) */}
       <AnimatePresence>
