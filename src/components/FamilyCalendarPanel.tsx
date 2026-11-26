@@ -300,8 +300,24 @@ export default function FamilyCalendarPanel({
       });
     }
 
-    // 3. Dated Shared List Items
+    // 3. Dated Shared Lists AND Dated Shared List Items (both can have independent dates!)
     for (const list of lists) {
+      if (list.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(list.dueDate)) {
+        const isBirthday = /birthday|bday/i.test(list.title);
+        const dateKey = isBirthday
+          ? `${displayYear}-${list.dueDate.slice(5, 10)}`
+          : list.dueDate;
+        push({
+          id: `list-${list.id}`,
+          title: list.title,
+          dateKey,
+          kind: isBirthday ? "BIRTHDAY" : "LIST_ITEM",
+          allDay: true,
+          participantIds: [],
+          listTitle: "Shared List",
+        });
+      }
+
       for (const item of list.items) {
         if (item.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)) {
           const isBirthday =

@@ -237,6 +237,7 @@ export const householdLists = sqliteTable("household_lists", {
   title: text("title").notNull(),
   type: text("type").notNull(),
   description: text("description").default(""),
+  dueDate: text("due_date").default(""),
   visibility: text("visibility").notNull().default("FAMILY"),
   createdById: text("created_by_id")
     .notNull()

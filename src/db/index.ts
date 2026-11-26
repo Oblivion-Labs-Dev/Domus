@@ -267,6 +267,7 @@ export async function ensureTables(): Promise<void> {
     "ALTER TABLE board_columns ADD COLUMN icon_asset TEXT DEFAULT ''",
     "ALTER TABLE board_cards ADD COLUMN icon_asset TEXT DEFAULT ''",
     "ALTER TABLE room_configs ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE household_lists ADD COLUMN due_date TEXT DEFAULT ''",
   ];
   for (const sql of safeAlters) {
     try {

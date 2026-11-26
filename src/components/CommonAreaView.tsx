@@ -205,6 +205,35 @@ export default function CommonAreaView({
     });
   }
 
+  async function handleUpdateListDate(listId: string, dueDate: string) {
+    // Instantly updates calendar right beside it!
+    setLists((prev) =>
+      prev.map((l) => (l.id === listId ? { ...l, dueDate } : l))
+    );
+    await fetch("/api/lists", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: listId, dueDate }),
+    });
+  }
+
+  async function handleUpdateItemDate(itemId: string, dueDate: string) {
+    // Instantly updates calendar right beside it!
+    setLists((prev) =>
+      prev.map((l) => ({
+        ...l,
+        items: l.items.map((it) =>
+          it.id === itemId ? { ...it, dueDate } : it
+        ),
+      }))
+    );
+    await fetch("/api/lists/items", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: itemId, dueDate }),
+    });
+  }
+
   async function handleAddItem(e: React.FormEvent, listId: string) {
     e.preventDefault();
     const draft = draftItems[listId];
@@ -299,8 +328,8 @@ export default function CommonAreaView({
     item: HouseholdListDTO["items"][number],
     fromListId: string
   ) {
-    // Ignore clicks on buttons/inputs inside the item (checkbox, delete)
-    if ((e.target as HTMLElement).closest("button, input")) return;
+    // Ignore clicks on buttons/inputs/date-labels inside the item (checkbox, date picker, delete)
+    if ((e.target as HTMLElement).closest("button, input, label")) return;
     if (e.button !== 0) return;
 
     const el = e.currentTarget;
@@ -797,6 +826,35 @@ export default function CommonAreaView({
                         </div>
                       </div>
 
+                      {/* Instant List Date (independent from individual task dates — syncs to Calendar immediately!) */}
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-[#f3ede4]/70 px-2.5 py-1.5">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#6b5d53]">
+                          <CalendarIcon className="h-3 w-3 text-terracotta-500" />
+                          List Date:
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="date"
+                            value={list.dueDate ?? ""}
+                            onChange={(e) =>
+                              handleUpdateListDate(list.id, e.target.value)
+                            }
+                            aria-label={`Set date for ${list.title}`}
+                            className="rounded-lg border border-[#dfd4c6] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#3d342e]"
+                          />
+                          {list.dueDate && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateListDate(list.id, "")}
+                              title="Clear list date"
+                              className="rounded p-0.5 text-[#8a7c71] hover:bg-white hover:text-red-600"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Draggable Items (Silky pointer drag — never square!) */}
                       <div className="space-y-1.5">
                         {list.items.length === 0 ? (
@@ -854,11 +912,49 @@ export default function CommonAreaView({
                                 >
                                   {item.title}
                                 </p>
+                              </div>
+
+                              {/* Instant Task Date Picker (independent from List Date — syncs to Calendar the moment you pick a date!) */}
+                              <div className="flex shrink-0 items-center gap-1">
+                                <label
+                                  title={
+                                    item.dueDate
+                                      ? `Task date: ${item.dueDate}`
+                                      : "Set task date (shows on Calendar immediately)"
+                                  }
+                                  className={`relative inline-flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-0.5 text-[10px] font-bold transition ${
+                                    item.dueDate
+                                      ? "bg-amber-100 text-amber-900"
+                                      : "text-[#8a7c71] hover:bg-white hover:text-[#1e1916]"
+                                  }`}
+                                >
+                                  <CalendarIcon className="h-3 w-3 shrink-0" />
+                                  {item.dueDate && (
+                                    <span>{item.dueDate.slice(5)}</span>
+                                  )}
+                                  <input
+                                    type="date"
+                                    value={item.dueDate ?? ""}
+                                    onChange={(e) =>
+                                      handleUpdateItemDate(
+                                        item.id,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                  />
+                                </label>
                                 {item.dueDate && (
-                                  <p className="inline-flex items-center gap-1 text-[10px] font-semibold text-terracotta-600">
-                                    <CalendarIcon className="h-2.5 w-2.5" />
-                                    {item.dueDate}
-                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateItemDate(item.id, "")
+                                    }
+                                    title="Clear task date"
+                                    className="rounded p-0.5 text-[#8a7c71] hover:text-red-600"
+                                  >
+                                    <X className="h-2.5 w-2.5" />
+                                  </button>
                                 )}
                               </div>
 
@@ -877,10 +973,10 @@ export default function CommonAreaView({
                       </div>
                     </div>
 
-                    {/* Inline Add Item Row */}
+                    {/* Clean Inline Add Item Row */}
                     <form
                       onSubmit={(e) => handleAddItem(e, list.id)}
-                      className="mt-3 space-y-1.5 border-t border-[#e8dfd3] pt-2.5"
+                      className="mt-3 border-t border-[#e8dfd3] pt-2.5"
                     >
                       <div className="flex gap-1.5">
                         <input
@@ -891,7 +987,7 @@ export default function CommonAreaView({
                               [list.id]: { ...draft, title: e.target.value },
                             }))
                           }
-                          placeholder="Add item..."
+                          placeholder="Add task or item..."
                           className="domus-input py-1.5 text-xs"
                         />
                         <button
@@ -901,23 +997,6 @@ export default function CommonAreaView({
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1 text-[10px] font-semibold text-[#7c6e63]">
-                          <CalendarIcon className="h-2.5 w-2.5" />
-                          Date (optional):
-                        </span>
-                        <input
-                          type="date"
-                          value={draft.dueDate}
-                          onChange={(e) =>
-                            setDraftItems((prev) => ({
-                              ...prev,
-                              [list.id]: { ...draft, dueDate: e.target.value },
-                            }))
-                          }
-                          className="rounded-lg border border-[#dfd4c6] bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-[#4e433b]"
-                        />
                       </div>
                     </form>
                   </div>

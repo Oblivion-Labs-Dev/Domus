@@ -74,6 +74,35 @@ export async function POST(request: Request) {
   return NextResponse.json({ id }, { status: 201 });
 }
 
+export async function PATCH(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const body = await request.json().catch(() => null);
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!id) {
+    return NextResponse.json({ error: "List id required" }, { status: 400 });
+  }
+  const updates: Record<string, unknown> = {};
+  if (typeof body?.dueDate === "string") {
+    updates.dueDate = body.dueDate.slice(0, 30);
+  }
+  if (typeof body?.title === "string" && body.title.trim()) {
+    updates.title = body.title.trim().slice(0, 100);
+  }
+  await db
+    .update(householdLists)
+    .set(updates)
+    .where(
+      and(
+        eq(householdLists.id, id),
+        eq(householdLists.householdId, actor.householdId)
+      )
+    );
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(request: Request) {
   const actor = await getCurrentMember();
   if (!actor) {

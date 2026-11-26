@@ -174,8 +174,9 @@ export interface ListItemDTO {
 export interface HouseholdListDTO {
   id: string;
   title: string;
-  type: "SHOPPING" | "MEAL_PREP" | "CHORES" | "GENERAL";
+  type: string;
   description: string | null;
+  dueDate?: string | null;
   visibility: string;
   items: ListItemDTO[];
 }
