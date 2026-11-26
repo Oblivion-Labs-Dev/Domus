@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   DoorOpen,
@@ -12,17 +12,22 @@ import {
   PlusCircle,
   ShieldCheck,
   Sparkles,
+  X,
 } from "lucide-react";
 import { AVATAR_PRESETS } from "@/lib/avatars";
 import MemberAvatar from "./MemberAvatar";
-import TiltCard from "./TiltCard";
 
 interface LoginViewProps {
   onAuthenticated: () => Promise<void>;
 }
 
 export default function LoginView({ onAuthenticated }: LoginViewProps) {
+  const [modalOpen, setModalOpen] = useState(false);
   const [mode, setMode] = useState<"ENTER" | "CREATE" | "RECOVER">("ENTER");
+
+  // Interactive 3D tilt for the floating house diorama
+  const houseRef = useRef<HTMLDivElement>(null);
+  const [houseTilt, setHouseTilt] = useState({ rotateX: 0, rotateY: 0 });
 
   // Enter House (ONLY House Name/Key + Room Key — key identifies the member automatically!)
   const [houseIdentifier, setHouseIdentifier] = useState("");
@@ -42,6 +47,34 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function openModal(initialMode: "ENTER" | "CREATE") {
+    setMode(initialMode);
+    setError(null);
+    setRecoverResult(null);
+    setModalOpen(true);
+  }
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setModalOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modalOpen]);
+
+  function handleHouseMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const el = houseRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    setHouseTilt({
+      rotateY: (px - 0.5) * 14,
+      rotateX: (0.5 - py) * 12,
+    });
+  }
 
   async function handleEnterHouse(e: React.FormEvent) {
     e.preventDefault();
@@ -131,77 +164,77 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden px-4 py-8 sm:px-6 lg:px-10">
-      {/* Dreamy Claymorphic 3D Floating Spheres (NO dots!) */}
+    <div className="relative flex min-h-screen flex-col overflow-hidden px-5 py-7 sm:px-8 lg:px-12">
+      {/* Warm Claymorphic 3D Floating Background Spheres */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <motion.div
           animate={{ y: [0, -18, 0], x: [0, 10, 0] }}
           transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -left-20 -top-20 h-80 w-80 rounded-full"
+          className="absolute -left-24 -top-24 h-80 w-80 rounded-full"
           style={{
             background:
               "radial-gradient(circle at 30% 30%, #ffd8c4 0%, #f1a988 65%, #e0835c 100%)",
             boxShadow:
               "inset -16px -18px 36px rgba(176, 68, 30, 0.25), inset 12px 12px 26px rgba(255,255,255,0.7), 0 30px 60px rgba(217, 83, 47, 0.16)",
-            opacity: 0.55,
+            opacity: 0.5,
           }}
         />
         <motion.div
           animate={{ y: [0, 20, 0], x: [0, -12, 0] }}
           transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -right-24 bottom-8 h-96 w-96 rounded-full"
+          className="absolute -right-24 bottom-4 h-96 w-96 rounded-full"
           style={{
             background:
               "radial-gradient(circle at 30% 30%, #d4eee0 0%, #8fc4a8 65%, #5b9978 100%)",
             boxShadow:
               "inset -18px -20px 40px rgba(32, 74, 54, 0.22), inset 14px 14px 30px rgba(255,255,255,0.7), 0 30px 60px rgba(59, 110, 82, 0.16)",
-            opacity: 0.55,
+            opacity: 0.5,
           }}
         />
         <motion.div
           animate={{ y: [0, -14, 0] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-1/2 top-16 h-44 w-44 -translate-x-1/2 rounded-full"
+          className="absolute left-[46%] top-12 h-40 w-40 -translate-x-1/2 rounded-full"
           style={{
             background:
               "radial-gradient(circle at 32% 32%, #fff3d1 0%, #f6d488 70%, #e5b352 100%)",
             boxShadow:
               "inset -10px -12px 24px rgba(180, 120, 20, 0.2), inset 8px 8px 18px rgba(255,255,255,0.8)",
-            opacity: 0.48,
+            opacity: 0.42,
           }}
         />
       </div>
 
-      <div className="mx-auto max-w-6xl">
-        {/* Clean Claymorphic Top Bar */}
-        <motion.header
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-10 flex flex-wrap items-center justify-between gap-4"
-        >
-          <div className="flex items-center gap-3.5">
-            <motion.div
-              whileHover={{ rotate: -6, y: -3, scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl text-white"
-              style={{
-                background: "linear-gradient(145deg, #ec704b 0%, #cf4e2a 100%)",
-                boxShadow:
-                  "0 12px 22px -6px rgba(217, 83, 47, 0.45), inset 0 2px 4px rgba(255,255,255,0.45), inset 0 -5px 8px rgba(143,44,18,0.4)",
-              }}
-            >
-              <Home className="h-5 w-5" />
-            </motion.div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-[#1e1916]">
-                Domus
-              </h1>
-              <p className="text-[11px] font-semibold text-[#6b5d53]">
-                Oblivion Labs
-              </p>
-            </div>
+      {/* Top Navigation */}
+      <motion.header
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4"
+      >
+        <div className="flex items-center gap-3.5">
+          <motion.div
+            whileHover={{ rotate: -6, y: -3, scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex h-12 w-12 items-center justify-center rounded-2xl text-white"
+            style={{
+              background: "linear-gradient(145deg, #ec704b 0%, #cf4e2a 100%)",
+              boxShadow:
+                "0 12px 22px -6px rgba(217, 83, 47, 0.45), inset 0 2px 4px rgba(255,255,255,0.45), inset 0 -5px 8px rgba(143,44,18,0.4)",
+            }}
+          >
+            <Home className="h-5 w-5" />
+          </motion.div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-[#1e1916]">
+              Domus
+            </h1>
+            <p className="text-[11px] font-semibold text-[#6b5d53]">
+              Oblivion Labs
+            </p>
           </div>
+        </div>
 
+        <div className="flex items-center gap-3">
           <motion.button
             type="button"
             whileHover={{ y: -2, scale: 1.02 }}
@@ -211,94 +244,209 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             className="domus-btn-secondary py-2.5 text-xs"
           >
             <Sparkles className="h-3.5 w-3.5 text-terracotta-500" />
-            {demoLoading ? "Opening Demo House..." : "Explore Live Demo"}
-            <ArrowRight className="h-3.5 w-3.5" />
+            {demoLoading ? "Opening Demo..." : "Explore Live Demo"}
           </motion.button>
-        </motion.header>
 
-        {/* Main 2-Column Claymorphic Hero */}
-        <div className="grid items-center gap-10 lg:grid-cols-12">
-          {/* Left 7 Cols: Timeless Headline + Seamless 2.5D House Centerpiece */}
-          <div className="space-y-7 lg:col-span-7">
+          <motion.button
+            type="button"
+            whileHover={{ y: -2, scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => openModal("ENTER")}
+            className="domus-btn-primary py-2.5 text-xs"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+            Enter House
+          </motion.button>
+        </div>
+      </motion.header>
+
+      {/* Main Split Hero: Left Story & CTAs | Right Borderless Floating 3D House */}
+      <main className="mx-auto flex w-full max-w-6xl flex-1 items-center py-10 lg:py-14">
+        <div className="grid w-full items-center gap-12 lg:grid-cols-12 lg:gap-10">
+          {/* Left Column: Headline, Description, Primary CTAs, Pillars */}
+          <div className="space-y-8 lg:col-span-6">
             <motion.div
-              initial={{ opacity: 0, y: 14 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.04 }}
-              className="space-y-3"
+              transition={{ delay: 0.05 }}
+              className="space-y-4"
             >
-              <h2 className="text-4xl font-extrabold leading-[1.1] tracking-tight text-[#1d1714] sm:text-5xl">
+              <h2 className="text-4xl font-extrabold leading-[1.08] tracking-tight text-[#1d1714] sm:text-5xl lg:text-[3.4rem]">
                 Build your family&apos;s digital house.
               </h2>
-              <p className="max-w-xl text-base leading-relaxed text-[#574c44]">
+              <p className="max-w-lg text-base leading-relaxed text-[#574c44] sm:text-lg">
                 One warm, flexible space to organize life at home — shared when
                 you want, private when you need, shaped entirely by the people
                 who live in it.
               </p>
             </motion.div>
 
-            {/* Seamless Claymorphic 2.5D House Pedestal (ZERO square seam!) */}
+            {/* Primary Entry Actions (Pop up the claymorphic Entry Modal) */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, type: "spring", stiffness: 220 }}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
+              className="flex flex-wrap items-center gap-3.5"
             >
-              <TiltCard
-                maxTilt={5}
-                lift={6}
-                glowColor="rgba(224, 93, 56, 0.14)"
-                className="overflow-hidden p-6 sm:p-8"
+              <motion.button
+                type="button"
+                whileHover={{ y: -3, scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => openModal("ENTER")}
+                className="domus-btn-accent px-7 py-3.5 text-sm"
               >
-                <div className="flex flex-col items-center">
-                  {/* Seamless blend so the 2.5D house floats directly on the clay surface */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/assets/house-hero.png"
-                    alt="Domus Digital House"
-                    className="max-h-[340px] w-full object-contain mix-blend-multiply"
-                  />
-                </div>
+                <DoorOpen className="h-4 w-4" />
+                Enter House
+                <ArrowRight className="h-4 w-4" />
+              </motion.button>
 
-                {/* 3 Tactile Claymorphic Pillars */}
-                <div className="mt-6 grid grid-cols-3 gap-3">
-                  {[
-                    { title: "Common Space", sub: "For the whole home" },
-                    { title: "Private Rooms", sub: "Yours to arrange" },
-                    { title: "Real Roles", sub: "Keys & permissions" },
-                  ].map((item) => (
-                    <motion.div
-                      key={item.title}
-                      whileHover={{ y: -3 }}
-                      className="domus-tile px-3 py-3 text-center"
-                    >
-                      <p className="text-xs font-bold text-[#1e1916]">
-                        {item.title}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-[#6b5d53]">
-                        {item.sub}
-                      </p>
-                    </motion.div>
-                  ))}
-                </div>
-              </TiltCard>
+              <motion.button
+                type="button"
+                whileHover={{ y: -3, scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => openModal("CREATE")}
+                className="domus-btn-secondary px-7 py-3.5 text-sm"
+              >
+                <PlusCircle className="h-4 w-4 text-sage-700" />
+                Create House
+              </motion.button>
+            </motion.div>
+
+            {/* 3 Tactile Claymorphic Pillars */}
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.18 }}
+              className="grid max-w-lg grid-cols-3 gap-3.5 pt-2"
+            >
+              {[
+                { title: "Common Space", sub: "For the whole home" },
+                { title: "Private Rooms", sub: "Yours to arrange" },
+                { title: "Real Roles", sub: "Keys & permissions" },
+              ].map((item) => (
+                <motion.div
+                  key={item.title}
+                  whileHover={{ y: -4 }}
+                  className="domus-tile px-3.5 py-3.5 text-left"
+                >
+                  <p className="text-xs font-bold text-[#1e1916]">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-snug text-[#6b5d53]">
+                    {item.sub}
+                  </p>
+                </motion.div>
+              ))}
             </motion.div>
           </div>
 
-          {/* Right 5 Cols: Strictly 2 Ways to Enter (Enter House | Create House) */}
+          {/* Right Column: Borderless Floating 3D House Centerpiece (NO square card!) */}
           <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.14 }}
-            className="lg:col-span-5"
+            initial={{ opacity: 0, scale: 0.92, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.1, type: "spring", stiffness: 180, damping: 20 }}
+            className="relative flex flex-col items-center justify-center lg:col-span-6"
+            style={{ perspective: 1200 }}
           >
-            <TiltCard
-              maxTilt={3.5}
-              lift={4}
-              className="p-6 sm:p-8"
-              contentClassName="space-y-6"
+            {/* Soft warm radial aura behind the house to blend with page background */}
+            <div
+              className="pointer-events-none absolute inset-6 -z-10 rounded-full blur-3xl"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(255, 241, 224, 0.85) 0%, rgba(244, 198, 168, 0.25) 55%, transparent 75%)",
+              }}
+            />
+
+            <div
+              ref={houseRef}
+              onMouseMove={handleHouseMouseMove}
+              onMouseLeave={() => setHouseTilt({ rotateX: 0, rotateY: 0 })}
+              className="relative flex w-full max-w-[560px] flex-col items-center cursor-pointer"
+              onClick={() => openModal("ENTER")}
+              title="Click to enter your digital house"
             >
+              <motion.div
+                animate={{
+                  rotateX: houseTilt.rotateX,
+                  rotateY: houseTilt.rotateY,
+                  y: [0, -10, 0],
+                }}
+                transition={{
+                  rotateX: { type: "spring", stiffness: 260, damping: 22 },
+                  rotateY: { type: "spring", stiffness: 260, damping: 22 },
+                  y: { duration: 5.5, repeat: Infinity, ease: "easeInOut" },
+                }}
+                style={{ transformStyle: "preserve-3d" }}
+                className="relative w-full"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/assets/house-hero-cutout.png"
+                  alt="Domus 3D Digital House"
+                  className="mx-auto w-full max-w-[540px] select-none object-contain"
+                  style={{
+                    filter:
+                      "drop-shadow(0 30px 38px rgba(96, 62, 42, 0.22)) drop-shadow(0 8px 14px rgba(96, 62, 42, 0.12))",
+                  }}
+                />
+              </motion.div>
+
+              {/* Soft floating 3D ground shadow that breathes with the house */}
+              <motion.div
+                animate={{
+                  scaleX: [1, 0.92, 1],
+                  opacity: [0.32, 0.2, 0.32],
+                }}
+                transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
+                className="-mt-4 h-7 w-[68%] rounded-full blur-xl"
+                style={{
+                  background:
+                    "radial-gradient(ellipse, rgba(78, 50, 34, 0.55) 0%, transparent 72%)",
+                }}
+              />
+            </div>
+          </motion.div>
+        </div>
+      </main>
+
+      {/* Subtle Bottom Security Note */}
+      <footer className="mx-auto flex w-full max-w-6xl items-center justify-center gap-2 pt-2 text-xs font-medium text-[#7c6e63] sm:justify-start">
+        <ShieldCheck className="h-3.5 w-3.5 text-sage-600" />
+        <span>Encrypted Room Keys · Signed HTTP-only sessions</span>
+      </footer>
+
+      {/* Claymorphic Pop-up Modal: Enter House or Create House */}
+      <AnimatePresence>
+        {modalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setModalOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.93, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ type: "spring", stiffness: 320, damping: 26 }}
+              onClick={(e) => e.stopPropagation()}
+              className="domus-card relative w-full max-w-md space-y-6 p-6 sm:p-8"
+            >
+              {/* Modal Close Button */}
+              <button
+                type="button"
+                aria-label="Close modal"
+                onClick={() => setModalOpen(false)}
+                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] transition hover:bg-[#e5d9ca] hover:text-[#1e1916]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
               {/* Strictly 2 Claymorphic Tabs */}
               <div
-                className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[#efe7dc] p-1.5 text-xs font-bold"
+                className="mr-10 grid grid-cols-2 gap-1.5 rounded-2xl bg-[#efe7dc] p-1.5 text-xs font-bold"
                 style={{
                   boxShadow: "inset 0 3px 6px rgba(74, 52, 38, 0.1)",
                 }}
@@ -357,6 +505,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       House Name or House Key
                     </label>
                     <input
+                      autoFocus
                       required
                       value={houseIdentifier}
                       onChange={(e) => setHouseIdentifier(e.target.value)}
@@ -430,6 +579,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       Name Your Residence
                     </label>
                     <input
+                      autoFocus
                       required
                       value={residenceName}
                       onChange={(e) => setResidenceName(e.target.value)}
@@ -539,6 +689,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     created.
                   </p>
                   <input
+                    autoFocus
                     type="email"
                     required
                     value={recoverEmail}
@@ -579,10 +730,10 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                 <ShieldCheck className="h-3.5 w-3.5 text-sage-600" />
                 <span>Encrypted Room Keys · Signed HTTP-only sessions</span>
               </div>
-            </TiltCard>
+            </motion.div>
           </motion.div>
-        </div>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
