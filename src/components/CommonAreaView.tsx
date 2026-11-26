@@ -38,6 +38,7 @@ interface CommonAreaViewProps {
   currentMember: MemberContext;
   household: HouseholdDTO | null;
   members: MemberDTO[];
+  knocksVersion?: number;
   onEnterRoom: (memberId: string) => void;
   onHouseholdChanged: () => Promise<void>;
   onKnocksChanged: () => Promise<void>;
@@ -51,6 +52,7 @@ export default function CommonAreaView({
   currentMember,
   household,
   members,
+  knocksVersion = 0,
   onEnterRoom,
   onHouseholdChanged,
   onKnocksChanged,
@@ -161,7 +163,7 @@ export default function CommonAreaView({
 
   useEffect(() => {
     loadAll();
-  }, [loadAll]);
+  }, [loadAll, knocksVersion]);
 
   // --- Shared Lists Actions ---
   async function handleCreateList(e: React.FormEvent) {

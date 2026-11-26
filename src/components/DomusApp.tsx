@@ -90,8 +90,9 @@ export default function DomusApp() {
     [inRoomOwnerId, leaveVisitedRoomIfAny]
   );
 
-  // Live incoming knocks on YOUR door
+  // Live incoming knocks on YOUR door (shared sync version across navbar, hallway & room!)
   const [incomingKnocks, setIncomingKnocks] = useState<RoomKnockDTO[]>([]);
+  const [knocksVersion, setKnocksVersion] = useState(0);
   const [knocksOpen, setKnocksOpen] = useState(false);
 
   // Wall Paint Studio state (triggered from the 2.5D Paint Bucket inside the Common Room!)
@@ -221,6 +222,7 @@ export default function DomusApp() {
       body: JSON.stringify({ knockId, status }),
     });
     await refreshKnocks();
+    setKnocksVersion((v) => v + 1);
   }
 
   async function handleDemoRoleSwitch(memberId: string) {
@@ -580,8 +582,13 @@ export default function DomusApp() {
                 currentMember={currentMember}
                 roomOwnerId={inRoomOwnerId}
                 members={session.members}
+                knocksVersion={knocksVersion}
                 onReturnToMyRoom={() => void navigateRoom(currentMember.id)}
                 onProfileChanged={loadSession}
+                onKnocksChanged={async () => {
+                  await refreshKnocks();
+                  setKnocksVersion((v) => v + 1);
+                }}
               />
             </motion.div>
           ) : (
@@ -596,9 +603,13 @@ export default function DomusApp() {
                 currentMember={currentMember}
                 household={session.household}
                 members={session.members}
+                knocksVersion={knocksVersion}
                 onEnterRoom={(ownerId) => void navigateRoom(ownerId)}
                 onHouseholdChanged={loadSession}
-                onKnocksChanged={refreshKnocks}
+                onKnocksChanged={async () => {
+                  await refreshKnocks();
+                  setKnocksVersion((v) => v + 1);
+                }}
               />
             </motion.div>
           )}

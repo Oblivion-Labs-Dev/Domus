@@ -61,16 +61,20 @@ interface PersonalRoomViewProps {
   currentMember: MemberContext;
   roomOwnerId: string;
   members: MemberDTO[];
+  knocksVersion?: number;
   onReturnToMyRoom: () => void;
   onProfileChanged?: () => Promise<void>;
+  onKnocksChanged?: () => Promise<void>;
 }
 
 export default function PersonalRoomView({
   currentMember,
   roomOwnerId,
   members,
+  knocksVersion = 0,
   onReturnToMyRoom,
   onProfileChanged,
+  onKnocksChanged,
 }: PersonalRoomViewProps) {
   const [config, setConfig] = useState<RoomConfigDTO | null>(null);
   const [board, setBoard] = useState<BoardDTO | null>(null);
@@ -288,7 +292,7 @@ export default function PersonalRoomView({
 
   useEffect(() => {
     loadRoom();
-  }, [loadRoom, currentMember.id]);
+  }, [loadRoom, currentMember.id, knocksVersion]);
 
   async function handleSaveAvatar(avatarId: string) {
     const res = await fetch("/api/auth/profile", {
@@ -357,6 +361,7 @@ export default function PersonalRoomView({
       body: JSON.stringify({ knockId, status }),
     });
     await loadRoom();
+    if (onKnocksChanged) await onKnocksChanged();
   }
 
   // Personal Tasks (backed by your Personal Board columns: To Do / Done)
