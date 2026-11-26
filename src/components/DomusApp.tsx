@@ -8,9 +8,11 @@ import {
   Check,
   Copy,
   DoorOpen,
+  Heart,
   Home,
   KeyRound,
   LogOut,
+  MessageSquareHeart,
   Moon,
   Shield,
   Sun,
@@ -90,8 +92,18 @@ export default function DomusApp() {
     [inRoomOwnerId, leaveVisitedRoomIfAny]
   );
 
-  // Live incoming knocks on YOUR door (shared sync version across navbar, hallway & room!)
+  // Live incoming knocks + Visitor Guestbook notifications on YOUR room
   const [incomingKnocks, setIncomingKnocks] = useState<RoomKnockDTO[]>([]);
+  const [roomNotesNotifs, setRoomNotesNotifs] = useState<
+    Array<{
+      id: string;
+      authorId: string;
+      kind: "COMMENT" | "LIKE";
+      message: string;
+      createdAt: string;
+    }>
+  >([]);
+  const [seenNotifAt, setSeenNotifAt] = useState<string>("");
   const [knocksVersion, setKnocksVersion] = useState(0);
   const [knocksOpen, setKnocksOpen] = useState(false);
 
@@ -168,17 +180,46 @@ export default function DomusApp() {
     saveAndApplyWallPaint(next);
   }
 
-  const refreshKnocks = useCallback(async () => {
+  const refreshKnocks = useCallback(async (memberIdOverride?: string) => {
     try {
-      const kRes = await fetch("/api/rooms/knocks", { cache: "no-store" });
+      const targetId = memberIdOverride ?? session.member?.id;
+      const [kRes, gbRes] = await Promise.all([
+        fetch("/api/rooms/knocks", { cache: "no-store" }),
+        targetId
+          ? fetch(
+              `/api/rooms/guestbook?roomOwnerId=${encodeURIComponent(targetId)}`,
+              { cache: "no-store" }
+            )
+          : Promise.resolve(null),
+      ]);
       if (kRes.ok) {
         const kd = await kRes.json();
         setIncomingKnocks(kd.incoming ?? []);
       }
+      if (gbRes && gbRes.ok && targetId) {
+        const gd = await gbRes.json();
+        const visitorComments = (gd.comments ?? [])
+          .filter((c: { authorId: string }) => c.authorId !== targetId)
+          .map(
+            (c: {
+              id: string;
+              authorId: string;
+              message: string;
+              createdAt: string;
+            }) => ({
+              id: c.id,
+              authorId: c.authorId,
+              kind: "COMMENT" as const,
+              message: c.message,
+              createdAt: c.createdAt,
+            })
+          );
+        setRoomNotesNotifs(visitorComments.slice(0, 10));
+      }
     } catch {
       // ignore
     }
-  }, []);
+  }, [session.member?.id]);
 
   const loadSession = useCallback(async () => {
     try {
@@ -194,7 +235,14 @@ export default function DomusApp() {
       });
 
       if (data.authenticated && data.member) {
-        await refreshKnocks();
+        if (typeof window !== "undefined") {
+          setSeenNotifAt(
+            window.localStorage.getItem(
+              `domus_seen_notes_${data.member.id}`
+            ) ?? ""
+          );
+        }
+        await refreshKnocks(data.member.id);
       }
     } catch {
       setSession((prev) => ({ ...prev, loading: false }));
@@ -281,7 +329,22 @@ export default function DomusApp() {
 
   const currentMember = session.member;
   const pendingKnocks = incomingKnocks.filter((k) => k.status === "KNOCKING");
+  const unreadNotes = roomNotesNotifs.filter(
+    (n) => !seenNotifAt || n.createdAt > seenNotifAt
+  );
+  const totalNotifBadge = pendingKnocks.length + unreadNotes.length;
   const memberById = Object.fromEntries(session.members.map((m) => [m.id, m]));
+
+  function markNotesAsRead() {
+    const nowIso = new Date().toISOString();
+    setSeenNotifAt(nowIso);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        `domus_seen_notes_${currentMember.id}`,
+        nowIso
+      );
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -402,32 +465,38 @@ export default function DomusApp() {
               <span className="hidden md:inline">Paint</span>
             </motion.button>
 
-            {/* Incoming Knocks Bell (wrapped in absolute container so .domus-card NEVER stretches navbar!) */}
+            {/* Notifications Bell: Door Knocks + Visitor Guestbook Notes */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setKnocksOpen((v) => !v)}
-                title="Door knocks on your room"
+                onClick={() => {
+                  const next = !knocksOpen;
+                  setKnocksOpen(next);
+                  if (next && unreadNotes.length > 0) {
+                    markNotesAsRead();
+                  }
+                }}
+                title="Notifications: Door knocks & visitor notes"
                 className={`relative inline-flex items-center gap-1.5 rounded-2xl border px-3 py-2 text-xs font-bold shadow-sm transition ${
-                  pendingKnocks.length > 0
+                  totalNotifBadge > 0
                     ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-200/80"
                     : "border-white/80 bg-[#f3ede4]/90 text-[#4e433b] hover:bg-white"
                 }`}
               >
                 <Bell className="h-3.5 w-3.5" />
-                {pendingKnocks.length > 0 && (
+                {totalNotifBadge > 0 && (
                   <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-terracotta-500 px-1 text-[10px] font-extrabold text-white">
-                    {pendingKnocks.length}
+                    {totalNotifBadge}
                   </span>
                 )}
               </button>
 
               {knocksOpen && (
-                <div className="absolute right-0 top-11 z-50 w-80">
-                  <div className="domus-card space-y-3 p-4 text-[#1e1916] shadow-2xl">
+                <div className="absolute right-0 top-11 z-50 w-80 sm:w-96">
+                  <div className="domus-card max-h-[75vh] space-y-3 overflow-y-auto p-4 text-[#1e1916] shadow-2xl">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-[#1e1916]">
-                        Knocks on Your Door
+                      <p className="text-xs font-extrabold text-[#1e1916]">
+                        Notifications
                       </p>
                       <button
                         type="button"
@@ -438,12 +507,12 @@ export default function DomusApp() {
                       </button>
                     </div>
 
-                    {pendingKnocks.length === 0 ? (
-                      <p className="rounded-2xl bg-[#f3ede4] px-3 py-3 text-xs text-[#6b5d53]">
-                        Nobody is knocking on your door right now.
-                      </p>
-                    ) : (
-                      <div className="space-y-2.5">
+                    {/* Door Knocks */}
+                    {pendingKnocks.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">
+                          Door Knocks
+                        </p>
                         {pendingKnocks.map((k) => {
                           const visitor = memberById[k.visitorId];
                           return (
@@ -499,6 +568,61 @@ export default function DomusApp() {
                         })}
                       </div>
                     )}
+
+                    {/* Visitor Notes left in your room */}
+                    {roomNotesNotifs.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                          <MessageSquareHeart className="h-3 w-3" />
+                          Notes Left in Your Room
+                        </p>
+                        {roomNotesNotifs.map((n) => {
+                          const author = memberById[n.authorId];
+                          return (
+                            <button
+                              key={n.id}
+                              type="button"
+                              onClick={() => {
+                                setKnocksOpen(false);
+                                void navigateRoom(currentMember.id);
+                              }}
+                              className="flex w-full items-start gap-2.5 rounded-2xl bg-[#f3ede4] p-3 text-left transition hover:bg-[#eae0d3]"
+                            >
+                              <MemberAvatar
+                                initials={author?.avatarInitials ?? "?"}
+                                color={author?.color ?? "#d45a33"}
+                                avatarId={author?.avatarId}
+                                size="sm"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="truncate text-xs font-bold text-[#1e1916]">
+                                    {author?.name ?? "Family Member"} left a note
+                                  </p>
+                                  <span className="shrink-0 text-[10px] text-[#7c6e63]">
+                                    {new Date(n.createdAt).toLocaleTimeString(
+                                      [],
+                                      { hour: "numeric", minute: "2-digit" }
+                                    )}
+                                  </span>
+                                </div>
+                                <p className="mt-0.5 line-clamp-2 text-xs text-[#574c44]">
+                                  &ldquo;{n.message}&rdquo;
+                                </p>
+                              </div>
+                              <Heart className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-400" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {pendingKnocks.length === 0 &&
+                      roomNotesNotifs.length === 0 && (
+                        <p className="rounded-2xl bg-[#f3ede4] px-3 py-4 text-center text-xs text-[#6b5d53]">
+                          All quiet — no door knocks or visitor notes yet.
+                        </p>
+                      )}
                   </div>
                 </div>
               )}

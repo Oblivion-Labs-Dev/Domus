@@ -69,7 +69,7 @@ Most family apps force you to choose between rigid corporate project boards and 
       <h3><img src="./public/assets/decor-weights.png" width="26" align="absmiddle" /> Private Rooms, Pinboard &amp; Earned Badges</h3>
       <ul>
         <li>Clear 2-state <strong>Locked | Open</strong> door switch on the far right of your room header.</li>
-        <li><strong>Strict Read-Only Visits &amp; Visitor Guestbook</strong>: Visitors see the room owner's name and cannot modify their tasks, notes, goals, badges, or calendar — instead they can <strong>Like</strong> the room and leave friendly comments in the <strong>Visitor Guestbook</strong>.</li>
+        <li><strong>Strict Read-Only Visits &amp; Visitor Guestbook</strong>: Visitors see the room owner's name and cannot modify their tasks, notes, goals, badges, or calendar — instead they can <strong>Like</strong> the room and leave friendly comments in the <strong>Visitor Guestbook</strong>, which trigger saved notifications in the room owner's header bell.</li>
         <li><strong>Personal Tasks</strong> with check/strikethrough and 1-click personal calendar scheduling.</li>
         <li><strong>Desk Notepad → Pinned Notes Board</strong>: Write and pin unlimited pastel sticky notes to your personal pinboard.</li>
         <li><strong>Personal Goals &amp; Habits</strong> with 2.5D progress rings, 100% completion cap, celebratory <strong>confetti</strong>, and persistent clickable <strong>Earned Badges</strong> (independent of goal deletion, with timestamp &amp; remove control).</li>
