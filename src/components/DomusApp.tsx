@@ -31,7 +31,7 @@ interface SessionState {
   member: MemberContext | null;
   household: HouseholdDTO | null;
   members: MemberDTO[];
-  demoSwitcherEnabled: boolean;
+  isDemoHouse: boolean;
 }
 
 export default function DomusApp() {
@@ -41,7 +41,7 @@ export default function DomusApp() {
     member: null,
     household: null,
     members: [],
-    demoSwitcherEnabled: true,
+    isDemoHouse: false,
   });
   const [activeTab, setActiveTab] = useState<ActiveTab>("entry");
   const [visitingRoomOwnerId, setVisitingRoomOwnerId] = useState<string | null>(
@@ -84,7 +84,7 @@ export default function DomusApp() {
         member: data.member ?? null,
         household: data.household ?? null,
         members: data.members ?? [],
-        demoSwitcherEnabled: Boolean(data.demoSwitcherEnabled),
+        isDemoHouse: Boolean(data.isDemoHouse),
       });
 
       if (data.authenticated && data.member) {
@@ -110,7 +110,7 @@ export default function DomusApp() {
     await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId }),
+      body: JSON.stringify({ demoSwitchMemberId: memberId }),
     });
     setVisitingRoomOwnerId(null);
     await loadSession();
@@ -155,14 +155,7 @@ export default function DomusApp() {
   }
 
   if (!session.authenticated || !session.member) {
-    return (
-      <LoginView
-        household={session.household}
-        demoMembers={session.members}
-        demoSwitcherEnabled={session.demoSwitcherEnabled}
-        onAuthenticated={loadSession}
-      />
-    );
+    return <LoginView onAuthenticated={loadSession} />;
   }
 
   const currentMember = session.member;
@@ -338,7 +331,7 @@ export default function DomusApp() {
               <span className="hidden sm:inline">Tour</span>
             </button>
 
-            {session.demoSwitcherEnabled && session.members.length > 1 && (
+            {session.isDemoHouse && session.members.length > 1 && (
               <div className="hidden items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 lg:flex">
                 <Shield className="h-3.5 w-3.5 shrink-0 text-amber-300" />
                 <select

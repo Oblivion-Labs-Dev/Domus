@@ -6,6 +6,7 @@ import { members } from "@/db/schema";
 import { MemberContext, parsePermissions, Role } from "./rbac";
 
 const SESSION_COOKIE = "domus_session";
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 const SESSION_SECRET =
   process.env.DOMUS_SESSION_SECRET ?? "domus-local-dev-secret-change-me";
 
@@ -25,8 +26,9 @@ export function verifyPassword(password: string, storedHash: string): boolean {
 }
 
 export function signSessionToken(memberId: string): string {
+  const now = Date.now();
   const payload = Buffer.from(
-    JSON.stringify({ sub: memberId, iat: Date.now() })
+    JSON.stringify({ sub: memberId, iat: now, exp: now + SESSION_TTL_MS })
   ).toString("base64url");
   const sig = crypto
     .createHmac("sha256", SESSION_SECRET)
@@ -46,7 +48,10 @@ export function verifySessionToken(token: string): string | null {
 
   const sigBuf = Buffer.from(sig);
   const expBuf = Buffer.from(expected);
-  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+  if (
+    sigBuf.length !== expBuf.length ||
+    !crypto.timingSafeEqual(sigBuf, expBuf)
+  ) {
     return null;
   }
 
@@ -54,7 +59,11 @@ export function verifySessionToken(token: string): string | null {
     const decoded = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8")
     );
-    return typeof decoded.sub === "string" ? decoded.sub : null;
+    if (typeof decoded.sub !== "string") return null;
+    if (typeof decoded.exp === "number" && Date.now() > decoded.exp) {
+      return null;
+    }
+    return decoded.sub;
   } catch {
     return null;
   }
@@ -68,7 +77,7 @@ export async function setSessionCookie(memberId: string): Promise<void> {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 14, // 14 days
+    maxAge: Math.floor(SESSION_TTL_MS / 1000),
   });
 }
 

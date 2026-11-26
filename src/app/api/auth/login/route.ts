@@ -1,86 +1,133 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { members } from "@/db/schema";
-import { seedIfEmpty } from "@/db/seed";
+import { and, eq } from "drizzle-orm";
+import { db, ensureTables } from "@/db";
+import { households, members } from "@/db/schema";
 import { setSessionCookie, verifyPassword } from "@/lib/auth";
-import { demoSwitchSchema, loginSchema } from "@/lib/validation";
 import { parsePermissions } from "@/lib/rbac";
 
+/**
+ * Production Authentication Endpoint
+ * Supports:
+ * 1. House Name or House Key + Your Name + Room Key (Password)
+ * 2. Email + Room Key (Password)
+ * Note: Demo role switching is strictly isolated to the Demo Residence (/api/demo).
+ */
 export async function POST(request: Request) {
-  await seedIfEmpty();
+  await ensureTables();
   const body = await request.json().catch(() => null);
   if (!body) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Demo quick-switch path (for testing roles seamlessly in local/demo mode)
-  const demoEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_SWITCHER !== "false";
-  if (demoEnabled && "memberId" in body && !("password" in body)) {
-    const parsed = demoSwitchSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid memberId" }, { status: 400 });
-    }
+  // Strictly scoped Demo-House switcher (ONLY works inside the dedicated Demo Residence!)
+  if (typeof body.demoSwitchMemberId === "string") {
     const rows = await db
       .select()
       .from(members)
-      .where(eq(members.id, parsed.data.memberId))
+      .where(
+        and(
+          eq(members.id, body.demoSwitchMemberId),
+          eq(members.householdId, "hh_demo_house")
+        )
+      )
       .limit(1);
-    const member = rows[0];
-    if (!member) {
-      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    const demoMember = rows[0];
+    if (!demoMember) {
+      return NextResponse.json(
+        { error: "Demo role switching is only available inside the Demo House." },
+        { status: 403 }
+      );
     }
-    await setSessionCookie(member.id);
+    await setSessionCookie(demoMember.id);
     return NextResponse.json({
       member: {
-        id: member.id,
-        householdId: member.householdId,
-        name: member.name,
-        email: member.email,
-        role: member.role,
-        title: member.title,
-        color: member.color,
-        avatarInitials: member.avatarInitials,
-        permissions: parsePermissions(member.permissionsJson),
+        id: demoMember.id,
+        householdId: demoMember.householdId,
+        name: demoMember.name,
+        email: demoMember.email,
+        role: demoMember.role,
+        title: demoMember.title,
+        color: demoMember.color,
+        avatarInitials: demoMember.avatarInitials,
+        permissions: parsePermissions(demoMember.permissionsJson),
       },
     });
   }
 
-  // Standard email + password authentication
-  const parsed = loginSchema.safeParse(body);
-  if (!parsed.success) {
+  const roomKey = String(body.roomKey ?? body.password ?? "").trim();
+  if (!roomKey) {
     return NextResponse.json(
-      { error: "Please provide a valid email and password." },
+      { error: "Please enter your Room Key." },
       { status: 400 }
     );
   }
 
-  const rows = await db
-    .select()
-    .from(members)
-    .where(eq(members.email, parsed.data.email.toLowerCase()))
-    .limit(1);
+  let matchedMember: typeof members.$inferSelect | undefined;
 
-  const member = rows[0];
-  if (!member || !verifyPassword(parsed.data.password, member.passwordHash)) {
+  // Path A: House Name / House Key + Member Name + Room Key
+  const houseIdentifier = String(body.houseIdentifier ?? "").trim();
+  const memberName = String(body.memberName ?? "").trim();
+
+  if (houseIdentifier && memberName) {
+    const allHouses = await db.select().from(households);
+    const normalizedHouse = houseIdentifier.toLowerCase();
+    const house = allHouses.find(
+      (h) =>
+        h.houseKey.toLowerCase() === normalizedHouse ||
+        h.name.toLowerCase() === normalizedHouse
+    );
+
+    if (!house) {
+      return NextResponse.json(
+        { error: "House not found. Check your House Name or House Key." },
+        { status: 401 }
+      );
+    }
+
+    const houseMembers = await db
+      .select()
+      .from(members)
+      .where(eq(members.householdId, house.id));
+
+    matchedMember = houseMembers.find(
+      (m) =>
+        m.name.toLowerCase() === memberName.toLowerCase() ||
+        m.email.toLowerCase() === memberName.toLowerCase()
+    );
+  } else if (typeof body.email === "string" && body.email.trim()) {
+    // Path B: Direct Email + Room Key
+    const rows = await db
+      .select()
+      .from(members)
+      .where(eq(members.email, body.email.trim().toLowerCase()))
+      .limit(1);
+    matchedMember = rows[0];
+  } else {
     return NextResponse.json(
-      { error: "Invalid email or password." },
+      { error: "Enter your House Name (or Key), your Name, and your Room Key." },
+      { status: 400 }
+    );
+  }
+
+  if (!matchedMember || !verifyPassword(roomKey, matchedMember.passwordHash)) {
+    return NextResponse.json(
+      { error: "Invalid credentials. Check your House, Name, or Room Key." },
       { status: 401 }
     );
   }
 
-  await setSessionCookie(member.id);
+  await setSessionCookie(matchedMember.id);
   return NextResponse.json({
     member: {
-      id: member.id,
-      householdId: member.householdId,
-      name: member.name,
-      email: member.email,
-      role: member.role,
-      title: member.title,
-      color: member.color,
-      avatarInitials: member.avatarInitials,
-      permissions: parsePermissions(member.permissionsJson),
+      id: matchedMember.id,
+      householdId: matchedMember.householdId,
+      name: matchedMember.name,
+      email: matchedMember.email,
+      role: matchedMember.role,
+      title: matchedMember.title,
+      color: matchedMember.color,
+      avatarInitials: matchedMember.avatarInitials,
+      permissions: parsePermissions(matchedMember.permissionsJson),
     },
   });
 }

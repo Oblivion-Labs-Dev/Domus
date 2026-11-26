@@ -1,15 +1,14 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureTables } from "@/db";
 import { calendarEvents, houseResources } from "@/db/schema";
-import { seedIfEmpty } from "@/db/seed";
 import { getCurrentMember } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { intervalsOverlap } from "@/lib/schedule";
 
 export async function GET() {
-  await seedIfEmpty();
+  await ensureTables();
   const viewer = await getCurrentMember();
   if (!viewer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

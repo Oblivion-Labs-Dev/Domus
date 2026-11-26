@@ -1,32 +1,39 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureTables } from "@/db";
 import { households, members } from "@/db/schema";
-import { seedIfEmpty } from "@/db/seed";
 import { getCurrentMember } from "@/lib/auth";
 import { parsePermissions } from "@/lib/rbac";
 
 export async function GET() {
-  await seedIfEmpty();
+  await ensureTables();
   const current = await getCurrentMember();
 
-  const allHouseholds = current
-    ? await db
-        .select()
-        .from(households)
-        .where(eq(households.id, current.householdId))
-        .limit(1)
-    : await db.select().from(households).limit(1);
-  const household = allHouseholds[0] ?? null;
+  // Never leak household roster or members to unauthenticated requests!
+  if (!current) {
+    return NextResponse.json({
+      authenticated: false,
+      member: null,
+      household: null,
+      members: [],
+      isDemoHouse: false,
+    });
+  }
 
-  const rosterRows = household
-    ? await db
-        .select()
-        .from(members)
-        .where(eq(members.householdId, household.id))
-    : [];
+  const [hhRows, rosterRows] = await Promise.all([
+    db
+      .select()
+      .from(households)
+      .where(eq(households.id, current.householdId))
+      .limit(1),
+    db
+      .select()
+      .from(members)
+      .where(eq(members.householdId, current.householdId)),
+  ]);
 
-  const demoMembers = rosterRows.map((m) => {
+  const household = hhRows[0] ?? null;
+  const householdMembers = rosterRows.map((m) => {
     const perms = parsePermissions(m.permissionsJson) as Record<
       string,
       unknown
@@ -45,10 +52,10 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    authenticated: Boolean(current),
+    authenticated: true,
     member: current,
     household,
-    members: demoMembers,
-    demoSwitcherEnabled: process.env.NEXT_PUBLIC_ENABLE_DEMO_SWITCHER !== "false",
+    members: householdMembers,
+    isDemoHouse: current.householdId === "hh_demo_house",
   });
 }

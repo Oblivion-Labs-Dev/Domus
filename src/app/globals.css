@@ -4,15 +4,15 @@
 
 :root,
 [data-palette="botanical"] {
-  --domus-bg: #dbeae2;
-  --domus-bg-glow-1: rgba(217, 83, 47, 0.14);
-  --domus-bg-glow-2: rgba(28, 69, 54, 0.16);
-  --domus-bg-dot: rgba(28, 69, 54, 0.18);
+  --domus-bg: #eef4f0;
+  --domus-bg-glow-1: rgba(217, 108, 67, 0.1);
+  --domus-bg-glow-2: rgba(28, 78, 60, 0.11);
+  --domus-bg-dot: rgba(22, 48, 41, 0.1);
   --domus-surface: #ffffff;
-  --domus-surface-sub: #f2f8f5;
-  --domus-border: #bdd6c8;
-  --domus-bevel: #9ec2ae;
-  --domus-header-bg: rgba(24, 59, 46, 0.94);
+  --domus-surface-sub: #f6faf8;
+  --domus-border: #d0e0d7;
+  --domus-bevel: #b3cbbd;
+  --domus-header-bg: rgba(22, 48, 41, 0.96);
   --domus-header-text: #f5fbf7;
   --domus-accent: #d9532f;
   --domus-accent-deep: #9c3318;
