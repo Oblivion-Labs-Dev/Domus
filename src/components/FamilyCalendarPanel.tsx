@@ -26,6 +26,8 @@ interface FamilyCalendarPanelProps {
   events: CalendarEventDTO[];
   lists: HouseholdListDTO[];
   onRefresh: () => Promise<void>;
+  personalOnly?: boolean;
+  ownerName?: string;
 }
 
 interface UnifiedCalEntry {
@@ -89,9 +91,13 @@ export default function FamilyCalendarPanel({
   events,
   lists,
   onRefresh,
+  personalOnly = false,
+  ownerName,
 }: FamilyCalendarPanelProps) {
   const [view, setView] = useState<"MONTH" | "WEEK" | "DAY">("MONTH");
-  const [scope, setScope] = useState<"ALL" | "MINE">("ALL");
+  const [scope, setScope] = useState<"ALL" | "MINE">(
+    personalOnly ? "MINE" : "ALL"
+  );
   const [cursorDate, setCursorDate] = useState<Date>(() => new Date());
 
   // Clicked-day Google-Calendar-style detail sheet
@@ -446,10 +452,18 @@ export default function FamilyCalendarPanel({
           />
           <div>
             <h2 className="text-base font-extrabold leading-tight tracking-tight text-[#1e1916]">
-              {scope === "MINE" ? "My Calendar" : "Family Calendar"}
+              {personalOnly
+                ? ownerName
+                  ? `${ownerName}'s Calendar`
+                  : "My Personal Calendar"
+                : scope === "MINE"
+                ? "My Calendar"
+                : "Family Calendar"}
             </h2>
             <p className="text-[10px] text-[#6b5d53]">
-              Holidays, birthdays, shared plans &amp; list dates
+              {personalOnly
+                ? "Your private schedule & house events involving you"
+                : "Holidays, birthdays, shared plans & list dates"}
             </p>
           </div>
         </div>
@@ -483,30 +497,32 @@ export default function FamilyCalendarPanel({
           ))}
         </div>
 
-        <div className="inline-flex rounded-xl bg-[#f3ede4] p-0.5 text-[11px] font-bold">
-          <button
-            type="button"
-            onClick={() => setScope("ALL")}
-            className={`rounded-lg px-2 py-1 transition ${
-              scope === "ALL"
-                ? "bg-white text-[#1e1916] shadow-sm"
-                : "text-[#6b5d53]"
-            }`}
-          >
-            All House
-          </button>
-          <button
-            type="button"
-            onClick={() => setScope("MINE")}
-            className={`rounded-lg px-2 py-1 transition ${
-              scope === "MINE"
-                ? "bg-white text-[#1e1916] shadow-sm"
-                : "text-[#6b5d53]"
-            }`}
-          >
-            My Calendar
-          </button>
-        </div>
+        {!personalOnly && (
+          <div className="inline-flex rounded-xl bg-[#f3ede4] p-0.5 text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setScope("ALL")}
+              className={`rounded-lg px-2 py-1 transition ${
+                scope === "ALL"
+                  ? "bg-white text-[#1e1916] shadow-sm"
+                  : "text-[#6b5d53]"
+              }`}
+            >
+              All House
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope("MINE")}
+              className={`rounded-lg px-2 py-1 transition ${
+                scope === "MINE"
+                  ? "bg-white text-[#1e1916] shadow-sm"
+                  : "text-[#6b5d53]"
+              }`}
+            >
+              My Calendar
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Date Navigation */}
