@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Cake,
@@ -98,11 +98,20 @@ export default function CommonAreaView({
   const [draftItems, setDraftItems] = useState<
     Record<string, { title: string; dueDate: string }>
   >({});
-  const [draggedItem, setDraggedItem] = useState<{
-    id: string;
+
+  // Silky pointer-based drag-and-drop (no ugly square browser ghost, zero flicker!)
+  const listCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [pointerDrag, setPointerDrag] = useState<{
+    item: HouseholdListDTO["items"][number];
     fromListId: string;
+    x: number;
+    y: number;
+    offsetX: number;
+    offsetY: number;
+    width: number;
   } | null>(null);
   const [dragOverListId, setDragOverListId] = useState<string | null>(null);
+  const dragOverRef = useRef<string | null>(null);
 
   // Knock Modal (for someone else's private door)
   const [knockTarget, setKnockTarget] = useState<MemberDTO | null>(null);
@@ -260,35 +269,111 @@ export default function CommonAreaView({
     });
   }
 
-  async function handleDropOnList(targetListId: string) {
-    setDragOverListId(null);
-    if (!draggedItem || draggedItem.fromListId === targetListId) {
-      setDraggedItem(null);
-      return;
-    }
-    const { id: itemId, fromListId } = draggedItem;
-    setDraggedItem(null);
+  const moveItemBetweenLists = useCallback(
+    async (itemId: string, fromListId: string, targetListId: string) => {
+      if (fromListId === targetListId) return;
+      let snapshot: HouseholdListDTO[] = [];
 
-    // Optimistic move between lists
-    setLists((prev) => {
-      let movedItem: HouseholdListDTO["items"][number] | null = null;
-      const removed = prev.map((l) => {
-        if (l.id !== fromListId) return l;
-        const found = l.items.find((it) => it.id === itemId);
-        if (found) movedItem = { ...found, listId: targetListId };
-        return { ...l, items: l.items.filter((it) => it.id !== itemId) };
+      // Optimistic move between lists
+      setLists((prev) => {
+        snapshot = prev;
+        let movedItem: HouseholdListDTO["items"][number] | null = null;
+        const removed = prev.map((l) => {
+          if (l.id !== fromListId) return l;
+          const found = l.items.find((it) => it.id === itemId);
+          if (found) movedItem = { ...found, listId: targetListId };
+          return { ...l, items: l.items.filter((it) => it.id !== itemId) };
+        });
+        if (!movedItem) return prev;
+        return removed.map((l) =>
+          l.id === targetListId ? { ...l, items: [movedItem!, ...l.items] } : l
+        );
       });
-      if (!movedItem) return prev;
-      return removed.map((l) =>
-        l.id === targetListId ? { ...l, items: [movedItem!, ...l.items] } : l
-      );
-    });
 
-    await fetch("/api/lists/items", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: itemId, listId: targetListId }),
-    });
+      try {
+        const res = await fetch("/api/lists/items", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: itemId, listId: targetListId }),
+        });
+        if (!res.ok) {
+          setLists(snapshot);
+        }
+      } catch {
+        setLists(snapshot);
+      }
+    },
+    []
+  );
+
+  function startPointerDrag(
+    e: React.PointerEvent<HTMLDivElement>,
+    item: HouseholdListDTO["items"][number],
+    fromListId: string
+  ) {
+    // Ignore clicks on buttons/inputs inside the item (checkbox, delete)
+    if ((e.target as HTMLElement).closest("button, input")) return;
+    if (e.button !== 0) return;
+
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const offsetX = startX - rect.left;
+    const offsetY = startY - rect.top;
+    const width = rect.width;
+    let dragging = false;
+
+    function hitTestList(cx: number, cy: number): string | null {
+      for (const [id, node] of Object.entries(listCardRefs.current)) {
+        if (!node) continue;
+        const r = node.getBoundingClientRect();
+        if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+          return id;
+        }
+      }
+      return null;
+    }
+
+    function onMove(ev: PointerEvent) {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!dragging && Math.hypot(dx, dy) < 5) return;
+      if (!dragging) {
+        dragging = true;
+        document.body.style.userSelect = "none";
+      }
+      const hovered = hitTestList(ev.clientX, ev.clientY);
+      dragOverRef.current = hovered;
+      setDragOverListId(hovered);
+      setPointerDrag({
+        item,
+        fromListId,
+        x: ev.clientX,
+        y: ev.clientY,
+        offsetX,
+        offsetY,
+        width,
+      });
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.body.style.userSelect = "";
+      const target = dragOverRef.current;
+      dragOverRef.current = null;
+      setPointerDrag(null);
+      setDragOverListId(null);
+      if (dragging && target && target !== fromListId) {
+        void moveItemBetweenLists(item.id, fromListId, target);
+      }
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }
 
   // --- Door & Knock Actions ---
@@ -701,27 +786,47 @@ export default function CommonAreaView({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5">
-                  {LIST_ICON_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setNewListIcon(opt.src)}
-                      className={`flex items-center gap-1 rounded-xl border px-2 py-1 text-[11px] font-semibold transition ${
-                        newListIcon === opt.src
-                          ? "border-terracotta-500 bg-terracotta-50 text-[#1e1916]"
-                          : "border-transparent bg-[#f3ede4] text-[#5c5047] hover:bg-[#eae0d3]"
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={opt.src}
-                        alt={opt.label}
-                        className="h-4 w-4 object-contain mix-blend-multiply"
-                      />
-                      {opt.label}
-                    </button>
-                  ))}
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-bold text-[#6b5d53]">
+                    Quick Pick or Icon (Optional)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LIST_ICON_OPTIONS.map((opt) => {
+                      const selected = newListIcon === opt.src;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => {
+                            setNewListIcon(opt.src);
+                            const presetLabels = LIST_ICON_OPTIONS.map(
+                              (o) => o.label
+                            );
+                            if (
+                              !newListTitle.trim() ||
+                              presetLabels.includes(newListTitle.trim())
+                            ) {
+                              setNewListTitle(opt.label);
+                            }
+                          }}
+                          className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-bold transition ${
+                            selected
+                              ? "border-[#1f332b] bg-[#1f332b] text-white shadow-sm"
+                              : "border-transparent bg-[#f3ede4] text-[#5c5047] hover:bg-[#eae0d3]"
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={opt.src}
+                            alt={opt.label}
+                            className="h-4 w-4 rounded object-contain"
+                          />
+                          {opt.label}
+                          {selected && <Check className="h-3 w-3" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </motion.form>
             )}
@@ -762,26 +867,19 @@ export default function CommonAreaView({
             <div className="grid gap-4 sm:grid-cols-2">
               {lists.map((list) => {
                 const draft = draftItems[list.id] ?? { title: "", dueDate: "" };
-                const isDropTarget = dragOverListId === list.id;
+                const isDropTarget =
+                  dragOverListId === list.id &&
+                  pointerDrag?.fromListId !== list.id;
 
                 return (
                   <div
                     key={list.id}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragOverListId !== list.id)
-                        setDragOverListId(list.id);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverListId === list.id) setDragOverListId(null);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleDropOnList(list.id);
+                    ref={(el) => {
+                      listCardRefs.current[list.id] = el;
                     }}
                     className={`domus-card flex flex-col justify-between p-4 transition-all ${
                       isDropTarget
-                        ? "ring-2 ring-terracotta-500 scale-[1.01]"
+                        ? "ring-2 ring-terracotta-500 scale-[1.015] bg-terracotta-50/40"
                         : ""
                     }`}
                   >
@@ -800,8 +898,19 @@ export default function CommonAreaView({
                               {list.title}
                             </h3>
                             <p className="text-[10px] text-[#6b5d53]">
-                              {list.items.filter((i) => !i.isCompleted).length}{" "}
-                              left · {list.items.length} total
+                              {isDropTarget ? (
+                                <span className="font-bold text-terracotta-600">
+                                  Drop here to move item
+                                </span>
+                              ) : (
+                                <>
+                                  {
+                                    list.items.filter((i) => !i.isCompleted)
+                                      .length
+                                  }{" "}
+                                  left · {list.items.length} total
+                                </>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -816,31 +925,30 @@ export default function CommonAreaView({
                         </button>
                       </div>
 
-                      {/* Draggable Items */}
+                      {/* Draggable Items (Silky pointer drag — never square!) */}
                       <div className="space-y-1.5">
                         {list.items.length === 0 ? (
                           <p className="rounded-xl border border-dashed border-[#dfd4c6] px-2.5 py-3 text-center text-[11px] text-[#8a7c71]">
                             Add an item or drag one here.
                           </p>
                         ) : (
-                          list.items.map((item) => (
-                            <div
-                              key={item.id}
-                              draggable
-                              onDragStart={() =>
-                                setDraggedItem({
-                                  id: item.id,
-                                  fromListId: list.id,
-                                })
-                              }
-                              onDragEnd={() => {
-                                setDraggedItem(null);
-                                setDragOverListId(null);
-                              }}
-                              className={`group flex cursor-grab items-center gap-2 rounded-xl bg-[#f3ede4] px-2.5 py-2 transition active:cursor-grabbing ${
-                                item.isCompleted ? "opacity-60" : ""
-                              }`}
-                            >
+                          list.items.map((item) => {
+                            const isBeingDragged =
+                              pointerDrag?.item.id === item.id;
+                            return (
+                              <div
+                                key={item.id}
+                                onPointerDown={(e) =>
+                                  startPointerDrag(e, item, list.id)
+                                }
+                                className={`group flex cursor-grab touch-none select-none items-center gap-2 rounded-xl bg-[#f3ede4] px-2.5 py-2 transition active:cursor-grabbing ${
+                                  isBeingDragged
+                                    ? "opacity-30 ring-1 ring-dashed ring-[#b8aa9c]"
+                                    : item.isCompleted
+                                    ? "opacity-60"
+                                    : ""
+                                }`}
+                              >
                               <GripVertical className="h-3 w-3 shrink-0 text-[#a09184]" />
 
                               <button
@@ -891,7 +999,8 @@ export default function CommonAreaView({
                                 <X className="h-3 w-3" />
                               </button>
                             </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     </div>
@@ -1563,6 +1672,40 @@ export default function CommonAreaView({
           </motion.div>
         )}
       </AnimatePresence>
+      {/* FLOATING ROUNDED DRAG PILL (smooth, rounded, never square!) */}
+      {pointerDrag && (
+        <div
+          className="pointer-events-none fixed z-50 flex items-center gap-2 rounded-2xl border border-white/90 bg-[#faf7f2] px-3 py-2.5 shadow-2xl ring-2 ring-terracotta-500/70"
+          style={{
+            left: pointerDrag.x - pointerDrag.offsetX,
+            top: pointerDrag.y - pointerDrag.offsetY,
+            width: pointerDrag.width,
+            transform: "scale(1.03) rotate(1deg)",
+          }}
+        >
+          <GripVertical className="h-3.5 w-3.5 shrink-0 text-terracotta-500" />
+          <div
+            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 ${
+              pointerDrag.item.isCompleted
+                ? "border-sage-600 bg-sage-600 text-white"
+                : "border-[#b8aa9c] bg-white"
+            }`}
+          >
+            {pointerDrag.item.isCompleted && (
+              <Check className="h-2.5 w-2.5 stroke-[3]" />
+            )}
+          </div>
+          <span
+            className={`truncate text-xs font-bold ${
+              pointerDrag.item.isCompleted
+                ? "text-[#7c6e63] line-through"
+                : "text-[#1e1916]"
+            }`}
+          >
+            {pointerDrag.item.title}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
