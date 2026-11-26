@@ -641,7 +641,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       required
                       value={houseIdentifier}
                       onChange={(e) => setHouseIdentifier(e.target.value)}
-                      placeholder="e.g., The Suryawanshi Residence or DOMUS-4821"
+                      placeholder="e.g., Maple Street House or DOMUS-4821"
                       className="domus-input"
                     />
                   </div>
@@ -717,7 +717,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       required
                       value={residenceName}
                       onChange={(e) => setResidenceName(e.target.value)}
-                      placeholder="e.g., The Suryawanshi Residence"
+                      placeholder="e.g., Maple Street House"
                       className="domus-input"
                     />
                   </div>
