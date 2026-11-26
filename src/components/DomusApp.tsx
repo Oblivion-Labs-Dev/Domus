@@ -187,16 +187,15 @@ export default function DomusApp() {
 
   return (
     <div className="min-h-screen">
-      {/* Clean Minimal Spatial Header (NO top nav tabs, NO broken Colors dropdown) */}
+      {/* Airy Frosted Claymorphic Header — adapts seamlessly to every Wall Paint & Wallpaper */}
       <header
-        className="sticky top-0 z-40 border-b border-white/10 backdrop-blur-md transition-colors duration-300"
+        className="sticky top-0 z-40 border-b border-white/75 bg-[#faf7f2]/75 text-[#1e1916] backdrop-blur-xl transition-colors duration-300"
         style={{
-          backgroundColor: "var(--domus-header-bg)",
-          color: "var(--domus-header-text)",
-          boxShadow: "0 10px 30px -12px rgba(0, 0, 0, 0.28)",
+          boxShadow:
+            "0 10px 30px -14px rgba(74, 52, 38, 0.14), inset 0 -1px 0 rgba(255, 255, 255, 0.65)",
         }}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
           {/* Left: Home Brand + Residence Name + 1-click House Key */}
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -210,18 +209,18 @@ export default function DomusApp() {
                 whileTap={{ scale: 0.95 }}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white"
                 style={{
-                  backgroundColor: "var(--domus-accent)",
+                  background: "linear-gradient(145deg, #ec704b 0%, #cf4e2a 100%)",
                   boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 10px rgba(0,0,0,0.22)",
+                    "0 8px 16px -4px rgba(217, 83, 47, 0.4), inset 0 2px 3px rgba(255,255,255,0.4)",
                 }}
               >
                 <Home className="h-4 w-4" />
               </motion.div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold tracking-tight text-white sm:text-base">
+                <p className="truncate text-sm font-extrabold tracking-tight text-[#1e1916] sm:text-base">
                   {session.household?.name ?? "Domus"}
                 </p>
-                <p className="text-[10px] font-medium text-white/65">
+                <p className="text-[11px] font-semibold text-[#6b5d53]">
                   {inRoomOwnerId
                     ? inRoomOwnerId === currentMember.id
                       ? "Inside Your Private Room"
@@ -236,14 +235,14 @@ export default function DomusApp() {
                 type="button"
                 onClick={handleCopyHeaderKey}
                 title="Copy House Key to share with family"
-                className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-mono text-[11px] font-bold text-white/90 transition hover:bg-white/20 sm:inline-flex"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-white/80 bg-[#f3ede4]/90 px-3 py-1 font-mono text-[11px] font-bold text-[#1e1916] shadow-sm transition hover:bg-white sm:inline-flex"
               >
-                <KeyRound className="h-3 w-3 text-amber-300" />
+                <KeyRound className="h-3 w-3 text-terracotta-500" />
                 {session.household.houseKey}
                 {copiedHouseKey ? (
-                  <Check className="h-3 w-3 text-emerald-300" />
+                  <Check className="h-3 w-3 text-sage-600" />
                 ) : (
-                  <Copy className="h-3 w-3 opacity-75" />
+                  <Copy className="h-3 w-3 text-[#7c6e63]" />
                 )}
               </button>
             )}
@@ -257,15 +256,15 @@ export default function DomusApp() {
                 type="button"
                 onClick={() => setKnocksOpen((v) => !v)}
                 title="Door knocks on your room"
-                className={`relative inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+                className={`relative inline-flex items-center gap-1.5 rounded-2xl border px-3 py-2 text-xs font-bold shadow-sm transition ${
                   pendingKnocks.length > 0
-                    ? "border-amber-300/50 bg-amber-400/20 text-amber-100 hover:bg-amber-400/30"
-                    : "border-white/20 bg-white/10 text-white/90 hover:bg-white/20"
+                    ? "border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-200/80"
+                    : "border-white/80 bg-[#f3ede4]/90 text-[#4e433b] hover:bg-white"
                 }`}
               >
                 <Bell className="h-3.5 w-3.5" />
                 {pendingKnocks.length > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-[#1e1916]">
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-terracotta-500 px-1 text-[10px] font-extrabold text-white">
                     {pendingKnocks.length}
                   </span>
                 )}
@@ -355,13 +354,13 @@ export default function DomusApp() {
 
             {/* Demo Member Switcher (only shown inside /api/demo) */}
             {session.isDemoHouse && session.members.length > 1 && (
-              <div className="hidden items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 lg:flex">
-                <Shield className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+              <div className="hidden items-center gap-1.5 rounded-2xl border border-white/80 bg-[#f3ede4]/90 px-3 py-1.5 shadow-sm lg:flex">
+                <Shield className="h-3.5 w-3.5 shrink-0 text-terracotta-500" />
                 <select
                   aria-label="Switch active demo family member"
                   value={currentMember.id}
                   onChange={(e) => handleDemoRoleSwitch(e.target.value)}
-                  className="cursor-pointer bg-transparent text-xs font-semibold text-white focus:outline-none"
+                  className="cursor-pointer bg-transparent text-xs font-bold text-[#1e1916] focus:outline-none"
                 >
                   {session.members.map((m) => (
                     <option
@@ -398,7 +397,7 @@ export default function DomusApp() {
               type="button"
               onClick={handleLogout}
               title="Leave House (Sign Out)"
-              className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20"
+              className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-white/80 bg-[#f3ede4]/90 p-2 text-[#4e433b] shadow-sm transition hover:bg-white hover:text-[#1e1916]"
             >
               <LogOut className="h-4 w-4" />
             </button>
