@@ -290,7 +290,12 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
             transition={{ delay: 0.14 }}
             className="lg:col-span-5"
           >
-            <TiltCard maxTilt={3.5} lift={4} className="space-y-5 p-6 sm:p-7">
+            <TiltCard
+              maxTilt={3.5}
+              lift={4}
+              className="p-6 sm:p-8"
+              contentClassName="space-y-6"
+            >
               {/* Strictly 2 Claymorphic Tabs */}
               <div
                 className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[#efe7dc] p-1.5 text-xs font-bold"
@@ -332,16 +337,16 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
               {/* WAY 1: ENTER HOUSE (ONLY House Name/Key + Room Key) */}
               {mode === "ENTER" && (
-                <form onSubmit={handleEnterHouse} className="space-y-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-terracotta-100 text-terracotta-600">
+                <form onSubmit={handleEnterHouse} className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-terracotta-100 text-terracotta-600">
                       <DoorOpen className="h-4 w-4" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-[#1e1916]">
                         Unlock Your Residence
                       </h3>
-                      <p className="text-[11px] text-[#6b5d53]">
+                      <p className="mt-0.5 text-xs text-[#6b5d53]">
                         Your key automatically recognizes who you are.
                       </p>
                     </div>
@@ -405,23 +410,23 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
 
               {/* WAY 2: CREATE A NEW HOUSE (Head of Household by default) */}
               {mode === "CREATE" && (
-                <form onSubmit={handleCreateHouse} className="space-y-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sage-100 text-sage-700">
+                <form onSubmit={handleCreateHouse} className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sage-100 text-sage-700">
                       <PlusCircle className="h-4 w-4" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-[#1e1916]">
                         Create Your Digital House
                       </h3>
-                      <p className="text-[11px] text-[#6b5d53]">
+                      <p className="mt-0.5 text-xs text-[#6b5d53]">
                         You start as Head of Household and invite family inside.
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
                       Name Your Residence
                     </label>
                     <input
@@ -433,9 +438,9 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                      <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
                         Your Name
                       </label>
                       <input
@@ -447,7 +452,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                      <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
                         Recovery Email
                       </label>
                       <input
@@ -462,7 +467,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
                       Set Your Room Key
                     </label>
                     <input
@@ -477,10 +482,10 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                    <label className="mb-2 block text-xs font-bold text-[#4e433b]">
                       Choose Your Avatar
                     </label>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {AVATAR_PRESETS.slice(0, 7).map((av) => (
                         <button
                           key={av.id}
@@ -523,13 +528,13 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
               {/* FORGOT KEY RECOVERY */}
               {mode === "RECOVER" && (
                 <form onSubmit={handleRecover} className="space-y-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <Mail className="h-4 w-4 text-terracotta-500" />
                     <h3 className="text-sm font-bold text-[#1e1916]">
                       Find Your House &amp; Key
                     </h3>
                   </div>
-                  <p className="text-xs text-[#6b5d53]">
+                  <p className="text-xs leading-relaxed text-[#6b5d53]">
                     Enter the recovery email saved when your profile was
                     created.
                   </p>
@@ -551,7 +556,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                       {error}
                     </p>
                   )}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2.5">
                     <button
                       type="button"
                       onClick={() => setMode("ENTER")}
@@ -570,7 +575,7 @@ export default function LoginView({ onAuthenticated }: LoginViewProps) {
                 </form>
               )}
 
-              <div className="flex items-center justify-center gap-1.5 border-t border-stone-200/70 pt-3 text-[11px] font-medium text-[#7c6e63]">
+              <div className="flex items-center justify-center gap-1.5 border-t border-stone-200/70 pt-4 text-[11px] font-medium text-[#7c6e63]">
                 <ShieldCheck className="h-3.5 w-3.5 text-sage-600" />
                 <span>Encrypted Room Keys · Signed HTTP-only sessions</span>
               </div>

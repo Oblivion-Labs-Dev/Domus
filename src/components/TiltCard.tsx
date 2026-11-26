@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 interface TiltCardProps {
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
   maxTilt?: number;
   lift?: number;
   glowColor?: string;
@@ -14,6 +15,7 @@ interface TiltCardProps {
 export default function TiltCard({
   children,
   className = "",
+  contentClassName = "",
   maxTilt = 6,
   lift = 5,
   glowColor = "rgba(212, 99, 62, 0.14)",
@@ -58,14 +60,14 @@ export default function TiltCard({
       >
         {/* Specular 2.5D surface sheen */}
         <div
-          className="pointer-events-none absolute inset-0 z-10 rounded-2xl transition-opacity duration-300"
+          className="pointer-events-none absolute inset-0 z-10 rounded-[28px] transition-opacity duration-300"
           style={{
             opacity: glare.opacity,
             background: `radial-gradient(280px circle at ${glare.x}% ${glare.y}%, ${glowColor}, transparent 68%)`,
           }}
         />
         <div
-          className="relative z-20 h-full"
+          className={`relative z-20 h-full ${contentClassName}`}
           style={{ transform: "translateZ(12px)" }}
         >
           {children}
