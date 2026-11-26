@@ -20,16 +20,23 @@ export async function GET() {
         .where(eq(members.householdId, household.id))
     : [];
 
-  const demoMembers = rosterRows.map((m) => ({
-    id: m.id,
-    name: m.name,
-    email: m.email,
-    role: m.role,
-    title: m.title,
-    color: m.color,
-    avatarInitials: m.avatarInitials,
-    permissions: parsePermissions(m.permissionsJson),
-  }));
+  const demoMembers = rosterRows.map((m) => {
+    const perms = parsePermissions(m.permissionsJson) as Record<
+      string,
+      unknown
+    >;
+    return {
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      title: m.title,
+      color: m.color,
+      avatarInitials: m.avatarInitials,
+      avatarId: typeof perms.avatarId === "string" ? perms.avatarId : null,
+      permissions: perms,
+    };
+  });
 
   return NextResponse.json({
     authenticated: Boolean(current),

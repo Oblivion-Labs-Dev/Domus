@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Palette, Plus, Sparkles, X } from "lucide-react";
+import { Plus, Search, ShoppingBag, Sparkles, X } from "lucide-react";
 import {
   DECOR_CATALOG,
   PlacedDecor,
   ROOM_THEMES,
   RoomThemeId,
+  SHOP_CATEGORIES,
+  ShopCategory,
 } from "@/lib/decor";
 import type { RoomConfigDTO } from "./types";
 
@@ -23,22 +25,39 @@ export default function DecorStudio({
   onSave,
 }: DecorStudioProps) {
   const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState<ShopCategory>("ALL");
+  const [query, setQuery] = useState("");
+  const [customLabel, setCustomLabel] = useState("");
   const [title, setTitle] = useState(config.roomTitle);
   const [quote, setQuote] = useState(config.bannerQuote);
   const [saving, setSaving] = useState(false);
 
   const assetById = new Map(DECOR_CATALOG.map((a) => [a.id, a]));
 
+  const filteredCatalog = DECOR_CATALOG.filter((item) => {
+    if (category !== "ALL" && item.category !== category) return false;
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.tagline.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
   async function handleAddDecor(assetId: string, defaultLabel: string) {
     if (readOnly) return;
+    const label = customLabel.trim() || defaultLabel;
     const next: PlacedDecor[] = [
       ...config.decorItems,
       {
         uid: `d_${Math.random().toString(36).slice(2, 8)}`,
         assetId,
-        label: defaultLabel,
+        label,
       },
     ];
+    setCustomLabel("");
     await onSave({ decorItems: next });
   }
 
@@ -68,6 +87,11 @@ export default function DecorStudio({
       {/* Placed 2.5D Decor Shelf */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
+          {config.decorItems.length === 0 && !readOnly && (
+            <span className="rounded-xl border border-dashed border-stone-300 bg-white/60 px-3 py-2 text-xs text-stone-500">
+              Your 2.5D shelf is empty — open the Shop to decorate your space!
+            </span>
+          )}
           <AnimatePresence initial={false}>
             {config.decorItems.map((item) => {
               const asset = assetById.get(item.assetId);
@@ -76,10 +100,10 @@ export default function DecorStudio({
                 <motion.div
                   key={item.uid}
                   layout
-                  initial={{ opacity: 0, scale: 0.75, y: 8 }}
+                  initial={{ opacity: 0, scale: 0.72, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.6 }}
-                  whileHover={{ y: -5, rotate: -1.5, scale: 1.05 }}
+                  whileHover={{ y: -5, rotate: -1.5, scale: 1.06 }}
                   transition={{ type: "spring", stiffness: 360, damping: 20 }}
                   className="group relative flex items-center gap-2 rounded-2xl border border-stone-200/90 bg-white/95 py-1.5 pl-1.5 pr-3 shadow-sm"
                   style={{
@@ -91,7 +115,7 @@ export default function DecorStudio({
                   <img
                     src={asset.src}
                     alt={asset.name}
-                    className="h-9 w-9 rounded-xl object-cover"
+                    className="h-10 w-10 rounded-xl bg-[#faf9f5] object-cover"
                   />
                   <span className="text-xs font-bold text-stone-800">
                     {item.label}
@@ -99,7 +123,7 @@ export default function DecorStudio({
                   {!readOnly && (
                     <button
                       onClick={() => handleRemoveDecor(item.uid)}
-                      title="Remove decoration"
+                      title="Remove item"
                       className="ml-0.5 rounded-full p-0.5 text-stone-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -116,27 +140,28 @@ export default function DecorStudio({
             onClick={() => setOpen((v) => !v)}
             className="domus-btn-secondary whitespace-nowrap text-xs"
           >
-            <Palette className="h-3.5 w-3.5 text-terracotta-500" />
-            {open ? "Done Decorating" : "Decorate Space"}
+            <ShoppingBag className="h-3.5 w-3.5 text-terracotta-500" />
+            {open ? "Close 2.5D Shop" : "Open 2.5D Decor Shop"}
           </button>
         )}
       </div>
 
-      {/* Expandable 2.5D Decoration & Theme Studio */}
+      {/* Expandable 2.5D Domus Shop & Theme Studio */}
       <AnimatePresence>
         {open && !readOnly && (
           <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.985 }}
+            initial={{ opacity: 0, y: -12, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.985 }}
+            exit={{ opacity: 0, y: -12, scale: 0.985 }}
             transition={{ type: "spring", stiffness: 320, damping: 26 }}
             className="domus-card space-y-5 p-5 text-stone-900"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-terracotta-500" />
                 <h4 className="text-sm font-bold">
-                  2.5D Space Studio — Customize Theme &amp; Decor Assets
+                  Domus 2.5D Decor Shop ({DECOR_CATALOG.length} items) &amp;
+                  Wall Themes
                 </h4>
               </div>
               <button
@@ -147,11 +172,11 @@ export default function DecorStudio({
               </button>
             </div>
 
-            {/* Wall Theme Selector */}
-            <div className="grid gap-5 lg:grid-cols-12">
-              <div className="space-y-2.5 lg:col-span-5">
+            <div className="grid gap-6 lg:grid-cols-12">
+              {/* Left: Wall Theme & Space Identity */}
+              <div className="space-y-3 lg:col-span-4">
                 <p className="text-xs font-bold uppercase tracking-wider text-stone-400">
-                  Wall Vibe / Theme
+                  1. Wall Vibe &amp; Title
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(Object.keys(ROOM_THEMES) as RoomThemeId[]).map((tid) => {
@@ -202,15 +227,58 @@ export default function DecorStudio({
                     </button>
                   </div>
                 </form>
+
+                <div className="rounded-xl border border-stone-200/80 bg-stone-50 p-3">
+                  <label className="mb-1 block text-[11px] font-bold text-stone-600">
+                    Optional Custom Label for Next Item
+                  </label>
+                  <input
+                    value={customLabel}
+                    onChange={(e) => setCustomLabel(e.target.value)}
+                    placeholder="e.g., Reading Corner, Yoga Spot..."
+                    className="domus-input text-xs"
+                  />
+                </div>
               </div>
 
-              {/* 2.5D Asset Shelf Picker */}
-              <div className="space-y-2.5 lg:col-span-7">
-                <p className="text-xs font-bold uppercase tracking-wider text-stone-400">
-                  Click Any 2.5D Object to Place in Your Space
-                </p>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  {DECOR_CATALOG.map((asset) => (
+              {/* Right: Categorized 2.5D Asset Shop */}
+              <div className="space-y-3 lg:col-span-8">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-stone-400">
+                    2. Pick 2.5D Objects to Place
+                  </p>
+                  <div className="relative w-full sm:w-52">
+                    <Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-stone-400" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search shop items..."
+                      className="domus-input py-1.5 pl-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Shop Category Pills */}
+                <div className="flex flex-wrap gap-1.5">
+                  {SHOP_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategory(cat.id)}
+                      className={`rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                        category === cat.id
+                          ? "bg-stone-900 text-white shadow-sm"
+                          : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 2.5D Shop Grid */}
+                <div className="grid max-h-72 grid-cols-2 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-4">
+                  {filteredCatalog.map((asset) => (
                     <motion.button
                       key={asset.id}
                       type="button"
@@ -224,9 +292,9 @@ export default function DecorStudio({
                         <img
                           src={asset.src}
                           alt={asset.name}
-                          className="h-14 w-14 rounded-xl object-cover transition-transform duration-200 group-hover:scale-105"
+                          className="h-16 w-16 rounded-xl bg-[#faf9f5] object-cover transition-transform duration-200 group-hover:scale-105"
                         />
-                        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-white opacity-0 shadow transition-opacity group-hover:opacity-100">
+                        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-terracotta-500 text-white opacity-0 shadow transition-opacity group-hover:opacity-100">
                           <Plus className="h-3 w-3" />
                         </span>
                       </div>

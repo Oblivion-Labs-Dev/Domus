@@ -17,6 +17,7 @@ export interface MemberDTO {
   title: string;
   color: string;
   avatarInitials: string;
+  avatarId?: string | null;
   permissions: PermissionOverrides;
   createdAt?: string;
 }

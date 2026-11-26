@@ -601,9 +601,10 @@ export default function CalendarView({
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Main Calendar Surface (8 cols) */}
         <div className="lg:col-span-8">
-          {/* WEEKLY VIEW (Google / Notion Style 7-Day Grid) */}
+          {/* WEEKLY VIEW (Responsive Google / Notion Style 7-Day Grid) */}
           {viewMode === "WEEKLY" && (
-            <div className="domus-card overflow-hidden">
+            <div className="domus-card overflow-x-auto">
+              <div className="min-w-[640px]">
               <div className="grid grid-cols-7 border-b border-stone-200 bg-stone-50/90">
                 {weekDays.map((d) => {
                   const key = toDateKey(d);
@@ -688,6 +689,7 @@ export default function CalendarView({
                     </div>
                   );
                 })}
+              </div>
               </div>
             </div>
           )}

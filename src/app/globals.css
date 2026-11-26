@@ -5,24 +5,25 @@
 @layer base {
   body {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    background-color: #faf9f5;
+    background-color: #f4eee3;
     background-image:
-      radial-gradient(circle at 12% 8%, rgba(212, 99, 62, 0.08), transparent 34%),
-      radial-gradient(circle at 88% 12%, rgba(79, 124, 91, 0.09), transparent 36%),
-      radial-gradient(rgba(120, 113, 100, 0.14) 1px, transparent 1px);
-    background-size: 100% 100%, 100% 100%, 24px 24px;
+      radial-gradient(circle at 10% 6%, rgba(212, 90, 51, 0.13), transparent 36%),
+      radial-gradient(circle at 90% 10%, rgba(59, 110, 82, 0.14), transparent 38%),
+      radial-gradient(circle at 50% 95%, rgba(54, 85, 120, 0.1), transparent 42%),
+      radial-gradient(rgba(115, 102, 85, 0.16) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 26px 26px;
     background-attachment: fixed;
   }
 }
 
-/* 2.5D Tactile Architectural Surface */
+/* 2.5D Tactile Warm Ivory Architectural Surface */
 .domus-card {
-  @apply relative rounded-2xl border border-stone-200/90 bg-white/95 backdrop-blur-sm transition-all duration-300;
+  @apply relative rounded-2xl border border-stone-200/90 bg-[#fffdf9]/95 backdrop-blur-sm transition-all duration-300;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 2px 0 0 rgba(212, 206, 192, 0.85),
-    0 10px 24px -10px rgba(25, 23, 20, 0.09),
-    0 2px 6px -2px rgba(25, 23, 20, 0.04);
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 3px 0 0 rgba(202, 187, 165, 0.85),
+    0 12px 28px -12px rgba(25, 21, 18, 0.12),
+    0 2px 6px -2px rgba(25, 21, 18, 0.05);
 }
 
 .domus-card-interactive {
@@ -31,87 +32,87 @@
 
 .domus-card-interactive:hover {
   transform: translateY(-4px);
-  border-color: rgba(168, 161, 147, 0.75);
+  border-color: rgba(158, 142, 120, 0.8);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 5px 0 0 rgba(212, 206, 192, 0.9),
-    0 22px 38px -14px rgba(25, 23, 20, 0.16),
-    0 4px 10px -2px rgba(25, 23, 20, 0.06);
+    0 5px 0 0 rgba(202, 187, 165, 0.95),
+    0 24px 40px -14px rgba(25, 21, 18, 0.18),
+    0 4px 10px -2px rgba(25, 21, 18, 0.07);
 }
 
-/* 2.5D Beveled Tile (Inset sub-card) */
+/* 2.5D Beveled Sub-Tile */
 .domus-tile {
-  @apply relative rounded-xl border border-stone-200/80 bg-gradient-to-b from-white to-stone-50/90 transition-all duration-200;
+  @apply relative rounded-xl border border-stone-200/90 bg-gradient-to-b from-[#fffdf9] to-stone-50/90 transition-all duration-200;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 2px 0 0 rgba(226, 221, 211, 0.9),
-    0 4px 12px -6px rgba(25, 23, 20, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 0 0 rgba(212, 200, 182, 0.9),
+    0 5px 14px -6px rgba(25, 21, 18, 0.09);
 }
 
 .domus-tile:hover {
   transform: translateY(-2px);
-  border-color: rgba(168, 161, 147, 0.7);
+  border-color: rgba(158, 142, 120, 0.75);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 4px 0 0 rgba(214, 208, 196, 0.95),
-    0 12px 22px -10px rgba(25, 23, 20, 0.14);
+    0 4px 0 0 rgba(202, 187, 165, 0.95),
+    0 14px 24px -10px rgba(25, 21, 18, 0.15);
 }
 
 /* 2.5D Tactile Push Buttons */
 .domus-btn-primary {
   @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-stone-800 to-stone-900 px-4 py-2 text-sm font-semibold text-white transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 4px 0 0 #0b0a08,
-    0 10px 18px -6px rgba(25, 23, 20, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 4px 0 0 #090706,
+    0 10px 20px -6px rgba(25, 21, 18, 0.38);
 }
 
 .domus-btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 6px 0 0 #0b0a08,
-    0 14px 24px -6px rgba(25, 23, 20, 0.42);
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 6px 0 0 #090706,
+    0 14px 24px -6px rgba(25, 21, 18, 0.45);
 }
 
 .domus-btn-primary:active:not(:disabled) {
   transform: translateY(2px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 1px 0 0 #0b0a08,
-    0 4px 8px -4px rgba(25, 23, 20, 0.3);
+    0 1px 0 0 #090706,
+    0 4px 8px -4px rgba(25, 21, 18, 0.32);
 }
 
 .domus-btn-accent {
   @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-terracotta-400 to-terracotta-500 px-4 py-2 text-sm font-semibold text-white transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 4px 0 0 #943a1f,
-    0 10px 20px -6px rgba(212, 99, 62, 0.42);
+    0 4px 0 0 #8f3216,
+    0 10px 22px -6px rgba(212, 90, 51, 0.45);
 }
 
 .domus-btn-accent:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 6px 0 0 #943a1f,
-    0 16px 26px -6px rgba(212, 99, 62, 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 6px 0 0 #8f3216,
+    0 16px 26px -6px rgba(212, 90, 51, 0.52);
 }
 
 .domus-btn-accent:active:not(:disabled) {
   transform: translateY(2px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 1px 0 0 #943a1f,
-    0 4px 10px -4px rgba(212, 99, 62, 0.38);
+    0 1px 0 0 #8f3216,
+    0 4px 10px -4px rgba(212, 90, 51, 0.38);
 }
 
 .domus-btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-gradient-to-b from-white to-stone-50 px-3.5 py-2 text-sm font-semibold text-stone-700 transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-gradient-to-b from-[#fffdf9] to-stone-50 px-3.5 py-2 text-sm font-semibold text-stone-700 transition-all duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    0 3px 0 0 #d4cec0,
-    0 6px 12px -6px rgba(25, 23, 20, 0.12);
+    0 3px 0 0 #cabba5,
+    0 6px 12px -6px rgba(25, 21, 18, 0.14);
 }
 
 .domus-btn-secondary:hover:not(:disabled) {
@@ -119,37 +120,19 @@
   @apply border-stone-300 text-stone-900;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 5px 0 0 #c9c2b2,
-    0 10px 18px -6px rgba(25, 23, 20, 0.16);
+    0 5px 0 0 #bda98f,
+    0 10px 18px -6px rgba(25, 21, 18, 0.18);
 }
 
 .domus-btn-secondary:active:not(:disabled) {
   transform: translateY(1.5px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 0 0 #d4cec0,
-    0 3px 6px -4px rgba(25, 23, 20, 0.12);
+    0 1px 0 0 #cabba5,
+    0 3px 6px -4px rgba(25, 21, 18, 0.14);
 }
 
 .domus-input {
-  @apply w-full rounded-xl border border-stone-200/90 bg-white px-3.5 py-2 text-sm text-stone-900 placeholder:text-stone-400 transition-all duration-150 focus:border-stone-500 focus:outline-none focus:ring-4 focus:ring-stone-200/60;
-  box-shadow: inset 0 2px 4px rgba(25, 23, 20, 0.035);
-}
-
-/* 2.5D Isometric Stage Helpers */
-.iso-stage {
-  perspective: 1100px;
-}
-
-.iso-plane {
-  transform: rotateX(54deg) rotateZ(-36deg);
-  transform-style: preserve-3d;
-}
-
-.domus-gloss {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.55) 0%,
-    rgba(255, 255, 255, 0) 48%
-  );
+  @apply w-full rounded-xl border border-stone-200/90 bg-white px-3.5 py-2 text-sm text-stone-900 placeholder:text-stone-400 transition-all duration-150 focus:border-terracotta-400 focus:outline-none focus:ring-4 focus:ring-terracotta-100;
+  box-shadow: inset 0 2px 4px rgba(25, 21, 18, 0.04);
 }

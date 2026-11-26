@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Calendar,
+  Compass,
   DoorOpen,
   Home,
   LayoutGrid,
@@ -15,7 +16,9 @@ import { MemberContext, ROLE_META } from "@/lib/rbac";
 import CalendarView from "./CalendarView";
 import CommonAreaView from "./CommonAreaView";
 import FamilyView from "./FamilyView";
+import HouseTour from "./HouseTour";
 import LoginView from "./LoginView";
+import MemberAvatar from "./MemberAvatar";
 import PersonalRoomView from "./PersonalRoomView";
 import { ActiveTab, HouseholdDTO, MemberDTO, RoomKnockDTO } from "./types";
 
@@ -45,6 +48,7 @@ export default function DomusApp() {
     undefined
   );
   const [knockCount, setKnockCount] = useState(0);
+  const [tourOpen, setTourOpen] = useState(false);
 
   const loadSession = useCallback(async () => {
     try {
@@ -67,6 +71,12 @@ export default function DomusApp() {
             (k: RoomKnockDTO) => k.status === "KNOCKING"
           ).length;
           setKnockCount(pending);
+        }
+        if (
+          typeof window !== "undefined" &&
+          !window.localStorage.getItem("domus_tour_seen")
+        ) {
+          setTourOpen(true);
         }
       }
     } catch {
@@ -170,6 +180,13 @@ export default function DomusApp() {
 
   return (
     <div className="min-h-screen">
+      {/* Guided Interactive 2.5D House Tour */}
+      <HouseTour
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        onNavigate={(tab) => handleNavigate(tab)}
+      />
+
       {/* Crisp Single-Line 2.5D Sculpted Header */}
       <header
         className="sticky top-0 z-40 border-b border-stone-200/80 bg-white/90 backdrop-blur-md"
@@ -251,8 +268,19 @@ export default function DomusApp() {
             })}
           </nav>
 
-          {/* Right Controls: Role Switcher + Perfect Circle Avatar + Logout */}
-          <div className="flex shrink-0 items-center gap-2.5">
+          {/* Right Controls: Tour + Role Switcher + Avatar + Logout */}
+          <div className="flex shrink-0 items-center gap-2">
+            <motion.button
+              whileHover={{ y: -1.5 }}
+              whileTap={{ y: 1 }}
+              onClick={() => setTourOpen(true)}
+              className="domus-btn-secondary shrink-0 whitespace-nowrap px-3 py-1.5 text-xs"
+              title="Launch guided house tour"
+            >
+              <Compass className="h-3.5 w-3.5 text-terracotta-500" />
+              <span className="hidden sm:inline">Tour</span>
+            </motion.button>
+
             {session.demoSwitcherEnabled && session.members.length > 1 && (
               <div
                 className="hidden items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 lg:flex"
@@ -279,26 +307,18 @@ export default function DomusApp() {
 
             <button
               onClick={() => handleNavigate("room")}
-              className="flex shrink-0 items-center gap-2.5 text-left"
+              className="flex shrink-0 items-center gap-2 text-left"
               title="Open My Room"
             >
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white"
-                style={{
-                  backgroundColor: currentMember.color,
-                  boxShadow: `0 3px 0 0 ${currentMember.color}88, 0 8px 14px -4px ${currentMember.color}66`,
-                }}
-              >
-                {currentMember.avatarInitials}
-              </div>
-              <div className="hidden xl:block">
-                <p className="whitespace-nowrap text-xs font-bold leading-tight text-stone-900">
-                  {currentMember.name}
-                </p>
-                <p className="whitespace-nowrap text-[10px] font-semibold text-stone-500">
-                  {ROLE_META[currentMember.role].badge}
-                </p>
-              </div>
+              <MemberAvatar
+                initials={currentMember.avatarInitials}
+                color={currentMember.color}
+                avatarId={
+                  (currentMember.permissions as Record<string, unknown>)
+                    ?.avatarId as string | undefined
+                }
+                size="md"
+              />
             </button>
 
             <motion.button

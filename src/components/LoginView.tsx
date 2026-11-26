@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Crown, Home, Lock, Shield, Sparkles } from "lucide-react";
 import { ROLE_META } from "@/lib/rbac";
+import MemberAvatar from "./MemberAvatar";
 import TiltCard from "./TiltCard";
 import type { HouseholdDTO, MemberDTO } from "./types";
 
@@ -206,15 +207,12 @@ export default function LoginView({
                       className="domus-tile group flex items-center justify-between p-3 text-left"
                     >
                       <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white"
-                          style={{
-                            backgroundColor: m.color,
-                            boxShadow: `0 3px 0 0 ${m.color}88, 0 8px 14px -4px ${m.color}66`,
-                          }}
-                        >
-                          {m.avatarInitials}
-                        </div>
+                        <MemberAvatar
+                          initials={m.avatarInitials}
+                          color={m.color}
+                          avatarId={m.avatarId}
+                          size="md"
+                        />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate text-sm font-bold text-stone-900">
@@ -287,13 +285,14 @@ export default function LoginView({
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-stone-600">
-                    Password
+                    Room Key (Password)
                   </label>
                   <input
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your Room Key..."
                     className="domus-input"
                   />
                 </div>
