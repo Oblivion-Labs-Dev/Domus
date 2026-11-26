@@ -334,6 +334,13 @@ export default function FamilyCalendarPanel({
           const dateKey = isBirthday
             ? `${displayYear}-${item.dueDate.slice(5, 10)}`
             : item.dueDate;
+          // Avoid duplicate pill if this task already has a timed Calendar Event on the same day
+          const alreadyScheduled = (map[dateKey] ?? []).some(
+            (e) =>
+              e.kind === "EVENT" &&
+              e.title.trim().toLowerCase() === item.title.trim().toLowerCase()
+          );
+          if (alreadyScheduled) continue;
           push({
             id: `li-${item.id}`,
             title: item.title,

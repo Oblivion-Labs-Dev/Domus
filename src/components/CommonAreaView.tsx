@@ -17,6 +17,7 @@ import {
   Send,
   Trash2,
   UserPlus,
+  Users,
   X,
 } from "lucide-react";
 import { AVATAR_PRESETS } from "@/lib/avatars";
@@ -126,6 +127,20 @@ export default function CommonAreaView({
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  // Schedule Task Modal (opens when clicking the calendar icon on any list item!)
+  const [scheduleTask, setScheduleTask] = useState<{
+    item: HouseholdListDTO["items"][number];
+    listTitle: string;
+  } | null>(null);
+  const [schedDate, setSchedDate] = useState("");
+  const [schedAllDay, setSchedAllDay] = useState(false);
+  const [schedStartTime, setSchedStartTime] = useState("14:00");
+  const [schedEndTime, setSchedEndTime] = useState("15:00");
+  const [schedParticipants, setSchedParticipants] = useState<string[]>([]);
+  const [schedNotes, setSchedNotes] = useState("");
+  const [schedSaving, setSchedSaving] = useState(false);
+  const [schedError, setSchedError] = useState<string | null>(null);
+
   const canInvite =
     currentMember.role === "HEAD" || currentMember.role === "CO_HEAD";
 
@@ -232,6 +247,81 @@ export default function CommonAreaView({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: itemId, dueDate }),
     });
+  }
+
+  function openScheduleTaskModal(
+    item: HouseholdListDTO["items"][number],
+    listTitle: string
+  ) {
+    const today = new Date();
+    const fallbackDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    setScheduleTask({ item, listTitle });
+    setSchedDate(item.dueDate || fallbackDate);
+    setSchedAllDay(false);
+    setSchedStartTime("14:00");
+    setSchedEndTime("15:00");
+    setSchedParticipants(
+      item.assigneeId ? [item.assigneeId] : [currentMember.id]
+    );
+    setSchedNotes("");
+    setSchedError(null);
+  }
+
+  async function handleSaveScheduledTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!scheduleTask || !schedDate) return;
+    setSchedError(null);
+
+    const sStr = schedAllDay ? "00:00" : schedStartTime;
+    const eStr = schedAllDay ? "23:59" : schedEndTime;
+    if (!schedAllDay && eStr <= sStr) {
+      setSchedError("End time must be after start time.");
+      return;
+    }
+
+    setSchedSaving(true);
+    try {
+      const involved =
+        schedParticipants.length > 0 ? schedParticipants : [currentMember.id];
+
+      // 1. Create the timed Calendar Event with involved family members
+      const evRes = await fetch("/api/calendar/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: scheduleTask.item.title,
+          category: "CHORE",
+          startTime: `${schedDate}T${sStr}:00`,
+          endTime: `${schedDate}T${eStr}:00`,
+          participantIds: involved,
+          visibility: "FAMILY",
+          isShared: true,
+          notes:
+            schedNotes.trim() || `From shared list: ${scheduleTask.listTitle}`,
+        }),
+      });
+      const evData = await evRes.json();
+      if (!evRes.ok) {
+        setSchedError(evData.error ?? "Could not schedule task.");
+        return;
+      }
+
+      // 2. Also save the date + primary assignee on the list item itself
+      await fetch("/api/lists/items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: scheduleTask.item.id,
+          dueDate: schedDate,
+          assigneeId: involved[0] ?? null,
+        }),
+      });
+
+      setScheduleTask(null);
+      await loadAll();
+    } finally {
+      setSchedSaving(false);
+    }
   }
 
   async function handleAddItem(e: React.FormEvent, listId: string) {
@@ -914,17 +1004,21 @@ export default function CommonAreaView({
                                 </p>
                               </div>
 
-                              {/* Instant Task Date Picker (independent from List Date — syncs to Calendar the moment you pick a date!) */}
+                              {/* Schedule Task Button (opens full Schedule modal with Date, Time & Who's Involved!) */}
                               <div className="flex shrink-0 items-center gap-1">
-                                <label
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openScheduleTaskModal(item, list.title)
+                                  }
                                   title={
                                     item.dueDate
-                                      ? `Task date: ${item.dueDate}`
-                                      : "Set task date (shows on Calendar immediately)"
+                                      ? `Scheduled for ${item.dueDate} — click to reschedule`
+                                      : "Schedule on Calendar (pick date, time & person)"
                                   }
-                                  className={`relative inline-flex cursor-pointer items-center gap-1 rounded-lg px-1.5 py-0.5 text-[10px] font-bold transition ${
+                                  className={`inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[10px] font-bold transition ${
                                     item.dueDate
-                                      ? "bg-amber-100 text-amber-900"
+                                      ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
                                       : "text-[#8a7c71] hover:bg-white hover:text-[#1e1916]"
                                   }`}
                                 >
@@ -932,18 +1026,7 @@ export default function CommonAreaView({
                                   {item.dueDate && (
                                     <span>{item.dueDate.slice(5)}</span>
                                   )}
-                                  <input
-                                    type="date"
-                                    value={item.dueDate ?? ""}
-                                    onChange={(e) =>
-                                      handleUpdateItemDate(
-                                        item.id,
-                                        e.target.value
-                                      )
-                                    }
-                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                  />
-                                </label>
+                                </button>
                                 {item.dueDate && (
                                   <button
                                     type="button"
@@ -1315,6 +1398,198 @@ export default function CommonAreaView({
                 </form>
               )}
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 3: SCHEDULE LIST TASK ON CALENDAR (Date, Time & Involved People!) */}
+      <AnimatePresence>
+        {scheduleTask && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setScheduleTask(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
+          >
+            <motion.form
+              initial={{ opacity: 0, scale: 0.94, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={handleSaveScheduledTask}
+              className="domus-card relative w-full max-w-md space-y-4 p-6 sm:p-7"
+            >
+              <button
+                type="button"
+                onClick={() => setScheduleTask(null)}
+                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] hover:bg-[#e5d9ca]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="pr-8">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-terracotta-600">
+                  Schedule Task · {scheduleTask.listTitle}
+                </p>
+                <h3 className="mt-0.5 text-base font-extrabold text-[#1e1916]">
+                  {scheduleTask.item.title}
+                </h3>
+                <p className="mt-0.5 text-xs text-[#6b5d53]">
+                  Pick a day, time, and who&apos;s involved to add this directly
+                  to the Calendar.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                    Date <span className="text-terracotta-500">*</span>
+                  </label>
+                  <input
+                    autoFocus
+                    type="date"
+                    required
+                    value={schedDate}
+                    onChange={(e) => setSchedDate(e.target.value)}
+                    className="domus-input"
+                  />
+                </div>
+                <div className="flex items-end pb-1">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#f3ede4] px-3 py-2 text-xs font-bold text-[#4e433b]">
+                    <input
+                      type="checkbox"
+                      checked={schedAllDay}
+                      onChange={(e) => setSchedAllDay(e.target.checked)}
+                      className="h-4 w-4 accent-terracotta-500"
+                    />
+                    All Day
+                  </label>
+                </div>
+              </div>
+
+              {!schedAllDay && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                      Start Time <span className="text-terracotta-500">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={schedStartTime}
+                      onChange={(e) => setSchedStartTime(e.target.value)}
+                      className="domus-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                      End Time <span className="text-terracotta-500">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={schedEndTime}
+                      onChange={(e) => setSchedEndTime(e.target.value)}
+                      className="domus-input"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Who's Involved */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-[#4e433b]">
+                    <Users className="h-3.5 w-3.5 text-terracotta-500" />
+                    Who&apos;s Involved?
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allIn = members.every((m) =>
+                        schedParticipants.includes(m.id)
+                      );
+                      setSchedParticipants(
+                        allIn ? [currentMember.id] : members.map((m) => m.id)
+                      );
+                    }}
+                    className="rounded-full bg-[#f3ede4] px-2.5 py-0.5 text-[10px] font-bold text-[#5c5047] hover:bg-[#e5d9ca]"
+                  >
+                    {members.every((m) => schedParticipants.includes(m.id))
+                      ? "✓ Whole Family"
+                      : "Select Whole Family"}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {members.map((m) => {
+                    const active = schedParticipants.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() =>
+                          setSchedParticipants((prev) =>
+                            prev.includes(m.id)
+                              ? prev.filter((id) => id !== m.id)
+                              : [...prev, m.id]
+                          )
+                        }
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold transition ${
+                          active
+                            ? "border-[#1f332b] bg-[#1f332b] text-white"
+                            : "border-transparent bg-[#f3ede4] text-[#5c5047] hover:bg-[#eae0d3]"
+                        }`}
+                      >
+                        <MemberAvatar
+                          initials={m.avatarInitials}
+                          color={m.color}
+                          avatarId={m.avatarId}
+                          size="sm"
+                        />
+                        {m.id === currentMember.id ? `${m.name} (You)` : m.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-bold text-[#4e433b]">
+                  Notes (Optional)
+                </label>
+                <input
+                  value={schedNotes}
+                  onChange={(e) => setSchedNotes(e.target.value)}
+                  placeholder="Any details or reminders..."
+                  className="domus-input"
+                />
+              </div>
+
+              {schedError && (
+                <p className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                  {schedError}
+                </p>
+              )}
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setScheduleTask(null)}
+                  className="domus-btn-secondary flex-1 py-2.5 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={schedSaving}
+                  className="domus-btn-accent flex-1 py-2.5 text-xs"
+                >
+                  {schedSaving ? "Scheduling..." : "Add to Calendar"}
+                </button>
+              </div>
+            </motion.form>
           </motion.div>
         )}
       </AnimatePresence>
