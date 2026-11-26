@@ -12,6 +12,7 @@ import {
   DoorOpen,
   ListTodo,
   Lock,
+  Pin,
   Plus,
   StickyNote,
   Target,
@@ -73,9 +74,13 @@ export default function PersonalRoomView({
   const [schedEnd, setSchedEnd] = useState("11:00");
   const [schedSaving, setSchedSaving] = useState(false);
 
-  // Private Desk Scratchpad
+  // Private Desk Notepad (pins multiple sticky notes to your Personal Pinboard!)
+  const [noteTitle, setNoteTitle] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
-  const [noteSaved, setNoteSaved] = useState(false);
+  const [noteColor, setNoteColor] = useState<
+    "butter" | "cream" | "terracotta" | "sage" | "sky"
+  >("butter");
+  const [noteSaving, setNoteSaving] = useState(false);
 
   // Personal Goals / Trackers
   const [showNewTracker, setShowNewTracker] = useState(false);
@@ -120,7 +125,6 @@ export default function PersonalRoomView({
       if (roomRes.ok) {
         const d = await roomRes.json();
         setConfig(d.config);
-        setNoteDraft(d.config?.bannerQuote ?? "");
         setTrackers(d.trackers ?? []);
       }
       if (boardRes.ok) {
@@ -161,9 +165,8 @@ export default function PersonalRoomView({
     await loadRoom();
   }
 
-  async function handleToggleDoorLock() {
-    if (!config || !isOwnRoom) return;
-    const nextPublic = !config.isPublic;
+  async function handleSetDoorOpen(nextPublic: boolean) {
+    if (!config || !isOwnRoom || Boolean(config.isPublic) === nextPublic) return;
     setConfig((prev) => (prev ? { ...prev, isPublic: nextPublic } : prev));
     await fetch("/api/rooms", {
       method: "PATCH",
@@ -175,18 +178,37 @@ export default function PersonalRoomView({
     });
   }
 
-  async function handleSaveScratchpad() {
-    if (!isOwnRoom) return;
-    await fetch("/api/rooms", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ownerKey: currentMember.id,
-        bannerQuote: noteDraft,
-      }),
-    });
-    setNoteSaved(true);
-    setTimeout(() => setNoteSaved(false), 1800);
+  async function handlePinNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isOwnRoom || !board || !todoCol) return;
+    const bodyText = noteDraft.trim();
+    const titleText = noteTitle.trim() || bodyText.slice(0, 42);
+    if (!titleText) return;
+
+    setNoteSaving(true);
+    try {
+      const res = await fetch("/api/boards/cards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          boardId: board.id,
+          columnId: todoCol.id,
+          title: titleText,
+          description: noteTitle.trim() ? bodyText : bodyText.length > 42 ? bodyText : "",
+          cardType: "NOTE",
+          noteColor,
+          priority: "LOW",
+          syncToCommonCalendar: false,
+        }),
+      });
+      if (res.ok) {
+        setNoteTitle("");
+        setNoteDraft("");
+        await loadRoom();
+      }
+    } finally {
+      setNoteSaving(false);
+    }
   }
 
   async function answerKnock(
@@ -357,6 +379,21 @@ export default function PersonalRoomView({
   const pendingKnocks = knocks.filter((k) => k.status === "KNOCKING");
   const activeGuests = knocks.filter((k) => k.status === "ALLOWED");
   const isDoorOpen = Boolean(config?.isPublic);
+  const taskCards = cards.filter((c) => c.cardType !== "NOTE");
+  const noteCards = cards.filter((c) => c.cardType === "NOTE");
+
+  const NOTE_SWATCHES: Array<{
+    id: "butter" | "cream" | "terracotta" | "sage" | "sky";
+    bg: string;
+    border: string;
+    dot: string;
+  }> = [
+    { id: "butter", bg: "bg-[#fef3c7]", border: "border-[#f3dc8a]", dot: "#f59e0b" },
+    { id: "cream", bg: "bg-[#fbf7ee]", border: "border-[#e6dcc9]", dot: "#a89882" },
+    { id: "terracotta", bg: "bg-[#fde8df]", border: "border-[#f3c5b2]", dot: "#e05d38" },
+    { id: "sage", bg: "bg-[#e3f1e8]", border: "border-[#bddbc7]", dot: "#3b6e52" },
+    { id: "sky", bg: "bg-[#e3effa]", border: "border-[#bdd5ee]", dot: "#2f6690" },
+  ];
 
   return (
     <div className="space-y-4 pb-6">
@@ -418,7 +455,7 @@ export default function PersonalRoomView({
             </div>
           </div>
 
-          {/* Far Right: Crystal-Clear Lock Door / Open Door Control */}
+          {/* Far Right: Unmistakable 2-State Door Lock Switch */}
           <div className="flex items-center gap-2.5">
             {!isOwnRoom ? (
               <button
@@ -430,47 +467,39 @@ export default function PersonalRoomView({
                 Back to My Room
               </button>
             ) : (
-              <div className="flex items-center gap-2 rounded-2xl bg-[#f3ede4] p-1.5">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold ${
-                    isDoorOpen
-                      ? "bg-sage-100 text-sage-900"
-                      : "bg-[#e7dfd4] text-[#4e433b]"
-                  }`}
-                >
-                  {isDoorOpen ? (
-                    <>
-                      <DoorOpen className="h-3.5 w-3.5 text-sage-700" />
-                      Door Open
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="h-3.5 w-3.5 text-terracotta-600" />
-                      Door Locked
-                    </>
-                  )}
-                </span>
-
+              <div
+                role="group"
+                aria-label="Room door lock"
+                className="inline-flex items-center gap-1 rounded-2xl bg-[#eae1d5] p-1"
+                style={{
+                  boxShadow: "inset 0 2px 5px rgba(74, 52, 38, 0.12)",
+                }}
+              >
                 <button
                   type="button"
-                  onClick={handleToggleDoorLock}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
-                    isDoorOpen
-                      ? "bg-[#1f332b] text-white hover:bg-[#162620]"
-                      : "bg-terracotta-500 text-white hover:bg-terracotta-600"
+                  onClick={() => handleSetDoorOpen(false)}
+                  aria-pressed={!isDoorOpen}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
+                    !isDoorOpen
+                      ? "bg-[#1f332b] text-white shadow-md"
+                      : "text-[#6b5d53] hover:text-[#1e1916]"
                   }`}
                 >
-                  {isDoorOpen ? (
-                    <>
-                      <Lock className="h-3.5 w-3.5" />
-                      Lock Door
-                    </>
-                  ) : (
-                    <>
-                      <DoorOpen className="h-3.5 w-3.5" />
-                      Open Door
-                    </>
-                  )}
+                  <Lock className="h-3.5 w-3.5" />
+                  Locked
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDoorOpen(true)}
+                  aria-pressed={isDoorOpen}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
+                    isDoorOpen
+                      ? "bg-sage-700 text-white shadow-md"
+                      : "text-[#6b5d53] hover:text-[#1e1916]"
+                  }`}
+                >
+                  <DoorOpen className="h-3.5 w-3.5" />
+                  Open
                 </button>
               </div>
             )}
@@ -559,12 +588,12 @@ export default function PersonalRoomView({
                 </div>
 
                 <div className="max-h-[260px] space-y-1.5 overflow-y-auto pr-1">
-                  {cards.length === 0 ? (
+                  {taskCards.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-[#dfd4c6] px-3 py-5 text-center text-xs text-[#8a7c71]">
                       No personal tasks yet. Add one below!
                     </p>
                   ) : (
-                    cards.map((card) => {
+                    taskCards.map((card) => {
                       const isDone = doneCol ? card.columnId === doneCol.id : false;
                       return (
                         <div
@@ -661,42 +690,66 @@ export default function PersonalRoomView({
               )}
             </section>
 
-            {/* Private Desk Scratchpad (5 cols) */}
-            <section className="domus-card flex flex-col justify-between p-4 sm:col-span-5 sm:p-5">
+            {/* Private Desk Notepad — Create & Pin Multiple Notes to Your Board */}
+            <form
+              onSubmit={handlePinNote}
+              className="domus-card flex flex-col justify-between p-4 sm:col-span-5 sm:p-5"
+            >
               <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <h2 className="flex items-center gap-1.5 text-base font-extrabold text-[#1e1916]">
                     <StickyNote className="h-4 w-4 text-amber-500" />
                     Desk Notepad
                   </h2>
-                  {noteSaved && (
-                    <span className="text-[10px] font-bold text-sage-700">
-                      Saved ✓
-                    </span>
+                  {isOwnRoom && (
+                    <div className="flex items-center gap-1">
+                      {NOTE_SWATCHES.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setNoteColor(s.id)}
+                          aria-label={`${s.id} note color`}
+                          className={`h-4 w-4 rounded-full border transition ${
+                            noteColor === s.id
+                              ? "scale-110 ring-2 ring-[#1f332b]"
+                              : "border-black/15 opacity-75 hover:opacity-100"
+                          }`}
+                          style={{ backgroundColor: s.dot }}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
 
+                <input
+                  disabled={!isOwnRoom}
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  placeholder="Note title (optional)..."
+                  className="w-full rounded-xl border border-[#e5dacb] bg-[#fdfaf4] px-3 py-1.5 text-xs font-bold text-[#1e1916] placeholder:font-normal placeholder:text-[#9c8e82] focus:border-terracotta-400 focus:outline-none"
+                />
+
                 <textarea
-                  rows={8}
+                  rows={5}
                   disabled={!isOwnRoom}
                   value={noteDraft}
                   onChange={(e) => setNoteDraft(e.target.value)}
-                  onBlur={handleSaveScratchpad}
-                  placeholder="Jot down daily focus, private ideas, reading list, or reminders..."
+                  placeholder="Write a note, idea, reminder, or list and pin it to your board below..."
                   className="w-full resize-none rounded-2xl border border-[#e5dacb] bg-[#fdfaf4] p-3 text-xs leading-relaxed text-[#2c2520] placeholder:text-[#9c8e82] focus:border-terracotta-400 focus:outline-none"
                 />
               </div>
 
               {isOwnRoom && (
                 <button
-                  type="button"
-                  onClick={handleSaveScratchpad}
-                  className="domus-btn-secondary mt-2.5 w-full py-1.5 text-xs"
+                  type="submit"
+                  disabled={noteSaving || (!noteTitle.trim() && !noteDraft.trim())}
+                  className="domus-btn-accent mt-2.5 w-full py-2 text-xs disabled:opacity-45"
                 >
-                  Save Note
+                  <Pin className="h-3.5 w-3.5" />
+                  {noteSaving ? "Pinning..." : "Pin Note to Board"}
                 </button>
               )}
-            </section>
+            </form>
           </div>
 
           {/* 2. PERSONAL GOALS & HABIT TRACKERS */}
@@ -887,6 +940,78 @@ export default function PersonalRoomView({
           ownerName={isOwnRoom ? undefined : roomOwner?.name}
         />
       </div>
+
+      {/* PERSONAL PINBOARD — Sticky Notes pinned from Desk Notepad */}
+      <section className="domus-card p-5">
+        <div className="mb-3.5 flex items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-extrabold text-[#1e1916]">
+              <Pin className="h-4 w-4 text-terracotta-500" />
+              Pinned Notes Board
+            </h2>
+            <p className="text-[11px] text-[#6b5d53]">
+              Every note you save from your Desk Notepad gets pinned here.
+            </p>
+          </div>
+          <span className="rounded-full bg-[#f3ede4] px-2.5 py-0.5 text-[11px] font-bold text-[#5c5047]">
+            {noteCards.length} {noteCards.length === 1 ? "note" : "notes"}
+          </span>
+        </div>
+
+        {noteCards.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#dfd4c6] px-4 py-6 text-center text-xs text-[#8a7c71]">
+            Your pinboard is clear — write anything in the{" "}
+            <strong>Desk Notepad</strong> above and click{" "}
+            <strong>Pin Note to Board</strong>.
+          </div>
+        ) : (
+          <div className="grid gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {noteCards.map((note, idx) => {
+              const style =
+                NOTE_SWATCHES.find((s) => s.id === note.noteColor) ??
+                NOTE_SWATCHES[0];
+              return (
+                <div
+                  key={note.id}
+                  className={`group relative rounded-2xl border p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${style.bg} ${style.border}`}
+                  style={{
+                    transform:
+                      idx % 2 === 0 ? "rotate(-0.4deg)" : "rotate(0.4deg)",
+                  }}
+                >
+                  {/* Little clay pin dot */}
+                  <span
+                    className="absolute left-1/2 top-2 h-2.5 w-2.5 -translate-x-1/2 rounded-full shadow-sm"
+                    style={{ backgroundColor: style.dot }}
+                  />
+
+                  {isOwnRoom && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(note.id)}
+                      title="Unpin note"
+                      className="absolute right-2.5 top-2.5 rounded-lg p-1 text-[#7c6e63] opacity-0 transition hover:bg-black/5 hover:text-red-600 group-hover:opacity-100"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+
+                  <div className="mt-2 space-y-1.5">
+                    <h3 className="pr-5 text-xs font-extrabold text-[#1e1916]">
+                      {note.title}
+                    </h3>
+                    {note.description && (
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#4e433b]">
+                        {note.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* SCHEDULE PERSONAL TASK MODAL */}
       <AnimatePresence>
