@@ -25,6 +25,12 @@ import { MemberContext, ROLE_META } from "@/lib/rbac";
 import CommonAreaView from "./CommonAreaView";
 import LoginView from "./LoginView";
 import MemberAvatar from "./MemberAvatar";
+import {
+  NavbarWallClock,
+  NavbarWeatherBackdrop,
+  NavbarWeatherPill,
+  useLocalWeather,
+} from "./NavbarAtmosphere";
 import PersonalRoomView from "./PersonalRoomView";
 import WallPaintModal from "./WallPaintModal";
 import { HouseholdDTO, MemberDTO, RoomKnockDTO } from "./types";
@@ -61,6 +67,7 @@ export default function DomusApp() {
   const [paintModalOpen, setPaintModalOpen] = useState(false);
 
   const [copiedHouseKey, setCopiedHouseKey] = useState(false);
+  const { weather, overrideKind, setOverrideKind } = useLocalWeather();
 
   useEffect(() => {
     const loaded = loadWallPaintConfig();
@@ -187,7 +194,7 @@ export default function DomusApp() {
 
   return (
     <div className="min-h-screen">
-      {/* Airy Frosted Claymorphic Header — adapts seamlessly to every Wall Paint & Wallpaper */}
+      {/* Airy Frosted Claymorphic Header — with live animated outdoor weather & analog wall clock */}
       <header
         className="sticky top-0 z-40 border-b border-white/75 bg-[#faf7f2]/75 text-[#1e1916] backdrop-blur-xl transition-colors duration-300"
         style={{
@@ -195,7 +202,8 @@ export default function DomusApp() {
             "0 10px 30px -14px rgba(74, 52, 38, 0.14), inset 0 -1px 0 rgba(255, 255, 255, 0.65)",
         }}
       >
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <NavbarWeatherBackdrop kind={weather.kind} />
+        <div className="relative z-10 mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
           {/* Left: Home Brand + Residence Name + 1-click House Key */}
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -246,6 +254,16 @@ export default function DomusApp() {
                 )}
               </button>
             )}
+          </div>
+
+          {/* Center: Analog Wall Clock + Live Outdoor Weather */}
+          <div className="flex shrink-0 items-center gap-2">
+            <NavbarWallClock />
+            <NavbarWeatherPill
+              weather={weather}
+              overrideKind={overrideKind}
+              onSelectOverride={setOverrideKind}
+            />
           </div>
 
           {/* Right Controls: Incoming Knocks + Demo Switcher + Avatar + Sign Out */}
