@@ -456,45 +456,125 @@ export default function FamilyCalendarPanel({
 
   return (
     <section className={`domus-card p-4 sm:p-5 ${className}`}>
-      {/* Top Header */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      {/* Row 1: Calendar Identity + Prominent Animated All House / My Calendar Switcher + Schedule CTA */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/assets/calendar-3d.png"
-            alt="Family Calendar"
+            alt="Calendar"
             className="h-8 w-8 shrink-0 object-contain mix-blend-multiply"
           />
-          <div>
-            <h2 className="text-base font-extrabold leading-tight tracking-tight text-[#1e1916]">
-              {personalOnly
-                ? ownerName
-                  ? `${ownerName}'s Calendar`
-                  : "My Personal Calendar"
-                : scope === "MINE"
-                ? "My Calendar"
-                : "Family Calendar"}
-            </h2>
-            <p className="text-[10px] text-[#6b5d53]">
-              {personalOnly
-                ? "Your private schedule & house events involving you"
-                : "Holidays, birthdays, shared plans & list dates"}
-            </p>
-          </div>
+
+          {personalOnly ? (
+            <div>
+              <h2 className="text-base font-extrabold leading-tight tracking-tight text-[#1e1916]">
+                {ownerName ? `${ownerName}'s Calendar` : "My Personal Calendar"}
+              </h2>
+              <p className="text-[10px] text-[#6b5d53]">
+                Your private schedule &amp; house events involving you
+              </p>
+            </div>
+          ) : (
+            <div
+              role="tablist"
+              aria-label="Calendar scope"
+              className="relative inline-flex items-center rounded-2xl bg-[#f3ede4] p-1 text-xs font-bold"
+            >
+              {(
+                [
+                  { id: "ALL", label: "All House" },
+                  { id: "MINE", label: "My Calendar" },
+                ] as const
+              ).map((tab) => {
+                const active = scope === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setScope(tab.id)}
+                    className={`relative z-10 rounded-xl px-3 py-1.5 transition-colors ${
+                      active
+                        ? "text-white"
+                        : "text-[#5c5047] hover:text-[#1e1916]"
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="calendar-scope-pill"
+                        transition={{
+                          type: "spring",
+                          stiffness: 420,
+                          damping: 32,
+                        }}
+                        className="absolute inset-0 -z-10 rounded-xl bg-[#1f332b] shadow-sm"
+                      />
+                    )}
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <button
           type="button"
           onClick={() => openAddModal(view === "DAY" ? activeDayKey : todayKey)}
-          className="domus-btn-accent px-3 py-1.5 text-[11px]"
+          className="domus-btn-accent px-3.5 py-1.5 text-xs"
         >
-          <Plus className="h-3 w-3" />
+          <Plus className="h-3.5 w-3.5" />
           Schedule
         </button>
       </div>
 
-      {/* View Switcher (Month | Week | Day) + Scope Toggle (All House | My Calendar) */}
+      {/* Row 2: Date Navigation + Today + View Switcher (Month | Week | Day) */}
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-0.5 rounded-xl bg-[#f3ede4] p-0.5">
+            <button
+              type="button"
+              onClick={() => stepCursor(-1)}
+              className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
+              aria-label="Previous"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="min-w-[116px] text-center text-xs font-extrabold text-[#1e1916]">
+              {headerLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => stepCursor(1)}
+              className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
+              aria-label="Next"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date();
+              const alreadyOnCurrentPeriod =
+                view === "MONTH"
+                  ? displayYear === now.getFullYear() &&
+                    displayMonth === now.getMonth()
+                  : toDateKey(cursorDate) === todayKey;
+              setCursorDate(now);
+              if (alreadyOnCurrentPeriod) {
+                setSelectedDayKey(todayKey);
+              }
+            }}
+            className="domus-btn-secondary px-2.5 py-1 text-[11px]"
+          >
+            Today
+          </button>
+        </div>
+
         <div className="inline-flex rounded-xl bg-[#f3ede4] p-0.5 text-[11px] font-bold">
           {(["MONTH", "WEEK", "DAY"] as const).map((v) => (
             <button
@@ -503,7 +583,7 @@ export default function FamilyCalendarPanel({
               onClick={() => setView(v)}
               className={`rounded-lg px-2.5 py-1 capitalize transition ${
                 view === v
-                  ? "bg-[#1f332b] text-white shadow-sm"
+                  ? "bg-white text-[#1e1916] shadow-sm"
                   : "text-[#5c5047] hover:text-[#1e1916]"
               }`}
             >
@@ -511,85 +591,46 @@ export default function FamilyCalendarPanel({
             </button>
           ))}
         </div>
+      </div>
 
+      {/* Legend + Active Scope Hint */}
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold text-[#6b5d53]">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-sky-500" />
+            Holiday
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-rose-500" />
+            Birthday
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-sage-600" />
+            Event
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            List
+          </span>
+        </div>
         {!personalOnly && (
-          <div className="inline-flex rounded-xl bg-[#f3ede4] p-0.5 text-[11px] font-bold">
-            <button
-              type="button"
-              onClick={() => setScope("ALL")}
-              className={`rounded-lg px-2 py-1 transition ${
-                scope === "ALL"
-                  ? "bg-white text-[#1e1916] shadow-sm"
-                  : "text-[#6b5d53]"
-              }`}
-            >
-              All House
-            </button>
-            <button
-              type="button"
-              onClick={() => setScope("MINE")}
-              className={`rounded-lg px-2 py-1 transition ${
-                scope === "MINE"
-                  ? "bg-white text-[#1e1916] shadow-sm"
-                  : "text-[#6b5d53]"
-              }`}
-            >
-              My Calendar
-            </button>
-          </div>
+          <span className="text-[10px] font-bold text-terracotta-600">
+            {scope === "MINE"
+              ? "Private + events involving you"
+              : "Shared house schedule"}
+          </span>
         )}
       </div>
 
-      {/* Date Navigation */}
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 rounded-xl bg-[#f3ede4] p-0.5">
-          <button
-            type="button"
-            onClick={() => stepCursor(-1)}
-            className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-          <span className="min-w-[120px] text-center text-xs font-extrabold text-[#1e1916]">
-            {headerLabel}
-          </span>
-          <button
-            type="button"
-            onClick={() => stepCursor(1)}
-            className="rounded-lg p-1 text-[#4e433b] hover:bg-white"
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setCursorDate(new Date())}
-          className="domus-btn-secondary px-2.5 py-1 text-[11px]"
+      {/* ANIMATED CALENDAR BODY (Smoothly slides & fades on All House ↔ My Calendar or View switch!) */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`${scope}-${view}-${displayYear}-${displayMonth}-${view === "DAY" ? activeDayKey : ""}`}
+          initial={{ opacity: 0, x: scope === "MINE" ? 12 : -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: scope === "MINE" ? -12 : 12 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
         >
-          Today
-        </button>
-      </div>
-
-      {/* Legend */}
-      <div className="mb-2 flex flex-wrap items-center gap-2.5 text-[10px] font-semibold text-[#6b5d53]">
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-sky-500" />
-          Holiday
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-rose-500" />
-          Birthday
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-sage-600" />
-          Event
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-amber-500" />
-          List
-        </span>
-      </div>
 
       {/* VIEW 1: MONTH GRID */}
       {view === "MONTH" && (
@@ -863,6 +904,8 @@ export default function FamilyCalendarPanel({
           </div>
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* DAY DETAIL MODAL (Opens when clicking any day — shows ALL events, tasks, birthdays, holidays!) */}
       <AnimatePresence>
