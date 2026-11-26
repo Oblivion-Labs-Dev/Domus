@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { householdLists, listItems } from "@/db/schema";
 import { getCurrentMember } from "@/lib/auth";
 import { can, canViewList } from "@/lib/rbac";
-import { createListItemSchema } from "@/lib/validation";
+import { createListItemSchema, updateListItemSchema } from "@/lib/validation";
 
 export async function POST(request: Request) {
   const actor = await getCurrentMember();
@@ -73,4 +73,81 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ id }, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const body = await request.json().catch(() => null);
+  const itemId = typeof body?.id === "string" ? body.id : "";
+  if (!itemId) {
+    return NextResponse.json({ error: "Item id required" }, { status: 400 });
+  }
+  const parsed = updateListItemSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid update" },
+      { status: 400 }
+    );
+  }
+
+  // If moving across lists via drag-and-drop, verify target list belongs to household
+  if (parsed.data.listId) {
+    const targetList = await db
+      .select({ id: householdLists.id })
+      .from(householdLists)
+      .where(
+        and(
+          eq(householdLists.id, parsed.data.listId),
+          eq(householdLists.householdId, actor.householdId)
+        )
+      )
+      .limit(1);
+    if (targetList.length === 0) {
+      return NextResponse.json(
+        { error: "Target list not found" },
+        { status: 404 }
+      );
+    }
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (parsed.data.listId !== undefined) updates.listId = parsed.data.listId;
+  if (parsed.data.isCompleted !== undefined)
+    updates.isCompleted = parsed.data.isCompleted;
+  if (parsed.data.title !== undefined) updates.title = parsed.data.title;
+  if (parsed.data.dueDate !== undefined) updates.dueDate = parsed.data.dueDate;
+  if (parsed.data.priority !== undefined)
+    updates.priority = parsed.data.priority;
+  if (parsed.data.assigneeId !== undefined)
+    updates.assigneeId = parsed.data.assigneeId;
+
+  await db
+    .update(listItems)
+    .set(updates)
+    .where(
+      and(eq(listItems.id, itemId), eq(listItems.householdId, actor.householdId))
+    );
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Item id required" }, { status: 400 });
+  }
+  await db
+    .delete(listItems)
+    .where(
+      and(eq(listItems.id, id), eq(listItems.householdId, actor.householdId))
+    );
+  return NextResponse.json({ ok: true });
 }

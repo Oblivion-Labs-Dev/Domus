@@ -15,6 +15,8 @@ export const createEventSchema = z
     category: z
       .enum([
         "FAMILY",
+        "BIRTHDAY",
+        "HOLIDAY",
         "EXERCISE",
         "DIET",
         "DRIVING",
@@ -74,7 +76,7 @@ export const createTrackerLogSchema = z.object({
 
 export const createListSchema = z.object({
   title: z.string().min(1).max(100),
-  type: z.enum(["SHOPPING", "MEAL_PREP", "CHORES", "GENERAL"]),
+  type: z.string().max(120).optional().default("GENERAL"),
   description: z.string().max(300).optional().default(""),
   visibility: z.enum(["FAMILY", "ADULTS_ONLY"]).default("FAMILY"),
 });
@@ -90,10 +92,12 @@ export const createListItemSchema = z.object({
 });
 
 export const updateListItemSchema = z.object({
+  listId: z.string().min(1).optional(),
   isCompleted: z.boolean().optional(),
   assigneeId: z.string().nullable().optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
   title: z.string().min(1).max(140).optional(),
+  dueDate: z.string().max(30).optional(),
 });
 
 export const inviteMemberSchema = z.object({

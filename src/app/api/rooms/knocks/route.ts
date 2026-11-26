@@ -35,9 +35,9 @@ export async function POST(request: Request) {
   const roomOwnerId =
     typeof body?.roomOwnerId === "string" ? body.roomOwnerId : "";
   const message =
-    typeof body?.message === "string" && body.message.trim()
+    typeof body?.message === "string"
       ? body.message.trim().slice(0, 200)
-      : "Knock knock! Mind if I visit your room?";
+      : "";
 
   if (!roomOwnerId || roomOwnerId === visitor.id) {
     return NextResponse.json(

@@ -1,370 +1,1546 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  BellRing,
-  CalendarClock,
+  Cake,
+  Calendar as CalendarIcon,
   Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  DoorClosed,
   DoorOpen,
-  Wrench,
+  GripVertical,
+  Hand,
+  KeyRound,
+  ListChecks,
+  Plus,
+  Send,
+  Sparkles,
+  Trash2,
+  UserPlus,
   X,
 } from "lucide-react";
-import { ROOM_THEMES } from "@/lib/decor";
-import type { MemberContext } from "@/lib/rbac";
-import CommonSocialHub from "./CommonSocialHub";
-import FreeformDecorCanvas from "./FreeformDecorCanvas";
-import InteractiveBoard from "./InteractiveBoard";
-import ListsView from "./ListsView";
-import SpaceBuilder, {
-  AvailableBlockOption,
-  normalizeSpaceBlocks,
-  SpaceBlockItem,
-} from "./SpaceBuilder";
-import TiltCard from "./TiltCard";
-import {
-  ActiveTab,
-  BoardCardDTO,
-  BoardColumnDTO,
-  BoardDTO,
-  formatShortDate,
-  HouseResourceDTO,
+import { AVATAR_PRESETS } from "@/lib/avatars";
+import { getPublicHolidaysForYear } from "@/lib/holidays";
+import { MemberContext, ROLE_META, Role } from "@/lib/rbac";
+import MemberAvatar from "./MemberAvatar";
+import type {
+  CalendarEventDTO,
+  HouseholdDTO,
+  HouseholdListDTO,
   MemberDTO,
-  RoomConfigDTO,
   RoomKnockDTO,
 } from "./types";
 
 interface CommonAreaViewProps {
   currentMember: MemberContext;
+  household: HouseholdDTO | null;
   members: MemberDTO[];
-  onNavigate: (tab: ActiveTab, preselectBookMemberId?: string) => void;
+  onEnterRoom: (memberId: string) => void;
+  onHouseholdChanged: () => Promise<void>;
+  onKnocksChanged: () => Promise<void>;
+}
+
+const LIST_ICON_OPTIONS = [
+  { id: "groceries", label: "Groceries", src: "/assets/decor-groceries.png" },
+  { id: "meals", label: "Meal Prep", src: "/assets/decor-salad.png" },
+  { id: "fitness", label: "Fitness", src: "/assets/decor-weights.png" },
+  { id: "errands", label: "Errands", src: "/assets/decor-car.png" },
+  { id: "home", label: "Home Care", src: "/assets/decor-toolbox.png" },
+  { id: "plants", label: "Garden", src: "/assets/decor-plant.png" },
+  { id: "coffee", label: "Treats", src: "/assets/decor-coffee.png" },
+  { id: "pets", label: "Pets", src: "/assets/decor-cat.png" },
+  { id: "general", label: "General", src: "/assets/board-3d.png" },
+];
+
+function getListIconSrc(type: string): string {
+  if (type.startsWith("/assets/")) return type;
+  const found = LIST_ICON_OPTIONS.find(
+    (opt) => opt.id.toUpperCase() === type.toUpperCase()
+  );
+  if (found) return found.src;
+  if (type === "SHOPPING") return "/assets/decor-groceries.png";
+  if (type === "MEAL_PREP") return "/assets/decor-salad.png";
+  if (type === "CHORES") return "/assets/decor-toolbox.png";
+  return "/assets/board-3d.png";
+}
+
+function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function CommonAreaView({
   currentMember,
+  household,
   members,
-  onNavigate,
+  onEnterRoom,
+  onHouseholdChanged,
+  onKnocksChanged,
 }: CommonAreaViewProps) {
-  const [roomConfig, setRoomConfig] = useState<RoomConfigDTO | null>(null);
-  const [board, setBoard] = useState<BoardDTO | null>(null);
-  const [columns, setColumns] = useState<BoardColumnDTO[]>([]);
-  const [cards, setCards] = useState<BoardCardDTO[]>([]);
-  const [resources, setResources] = useState<HouseResourceDTO[]>([]);
+  // Data
+  const [lists, setLists] = useState<HouseholdListDTO[]>([]);
+  const [events, setEvents] = useState<CalendarEventDTO[]>([]);
+  const [outgoingKnocks, setOutgoingKnocks] = useState<RoomKnockDTO[]>([]);
   const [incomingKnocks, setIncomingKnocks] = useState<RoomKnockDTO[]>([]);
-  const [showLists, setShowLists] = useState(false);
+  const [publicRoomOwners, setPublicRoomOwners] = useState<Set<string>>(
+    new Set()
+  );
+  const [loading, setLoading] = useState(true);
 
-  const memberById = new Map(members.map((m) => [m.id, m]));
+  // Shared Lists UI
+  const [newListOpen, setNewListOpen] = useState(false);
+  const [newListTitle, setNewListTitle] = useState("");
+  const [newListIcon, setNewListIcon] = useState("/assets/decor-groceries.png");
+  const [draftItems, setDraftItems] = useState<
+    Record<string, { title: string; dueDate: string }>
+  >({});
+  const [draggedItem, setDraggedItem] = useState<{
+    id: string;
+    fromListId: string;
+  } | null>(null);
+  const [dragOverListId, setDragOverListId] = useState<string | null>(null);
 
-  const loadCommon = useCallback(async () => {
-    const [roomRes, boardRes, resRes, knockRes] = await Promise.all([
-      fetch("/api/rooms?ownerKey=COMMON"),
-      fetch("/api/boards?scope=COMMON"),
-      fetch("/api/resources"),
-      fetch("/api/rooms/knocks"),
-    ]);
+  // Knock Modal (for someone else's private door)
+  const [knockTarget, setKnockTarget] = useState<MemberDTO | null>(null);
+  const [knockMessage, setKnockMessage] = useState("");
+  const [knockSending, setKnockSending] = useState(false);
 
-    if (roomRes.ok) {
-      const d = await roomRes.json();
-      setRoomConfig(d.config);
-    }
-    if (boardRes.ok) {
-      const d = await boardRes.json();
-      setBoard(d.board);
-      setColumns(d.columns ?? []);
-      setCards(d.cards ?? []);
-    }
-    if (resRes.ok) {
-      const d = await resRes.json();
-      setResources(d.resources ?? []);
-    }
-    if (knockRes.ok) {
-      const d = await knockRes.json();
-      setIncomingKnocks(
-        (d.incoming ?? []).filter(
-          (k: RoomKnockDTO) => k.status === "KNOCKING"
-        )
-      );
+  // Add Family Member Modal (for Head / Co-Head)
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [memberName, setMemberName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberRole, setMemberRole] = useState<Role>("MEMBER");
+  const [memberAvatarId, setMemberAvatarId] = useState("fox");
+  const [memberSaving, setMemberSaving] = useState(false);
+  const [memberError, setMemberError] = useState<string | null>(null);
+  const [mintedMemberKeycard, setMintedMemberKeycard] = useState<{
+    name: string;
+    houseKey: string;
+    roomKey: string;
+  } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Family Calendar UI
+  const [calCursor, setCalCursor] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDate, setEventDate] = useState(() => toDateKey(new Date()));
+  const [eventCategory, setEventCategory] = useState<
+    "FAMILY" | "BIRTHDAY" | "HOLIDAY"
+  >("FAMILY");
+  const [eventNotes, setEventNotes] = useState("");
+  const [eventSaving, setEventSaving] = useState(false);
+
+  const canInvite =
+    currentMember.role === "HEAD" || currentMember.role === "CO_HEAD";
+
+  const loadAll = useCallback(async () => {
+    try {
+      const [listsRes, eventsRes, knocksRes, familyRes] = await Promise.all([
+        fetch("/api/lists", { cache: "no-store" }),
+        fetch("/api/calendar/events", { cache: "no-store" }),
+        fetch("/api/rooms/knocks", { cache: "no-store" }),
+        fetch("/api/family/members", { cache: "no-store" }),
+      ]);
+
+      if (listsRes.ok) {
+        const d = await listsRes.json();
+        setLists(d.lists ?? []);
+      }
+      if (eventsRes.ok) {
+        const d = await eventsRes.json();
+        setEvents(d.events ?? []);
+      }
+      if (knocksRes.ok) {
+        const d = await knocksRes.json();
+        setOutgoingKnocks(d.outgoing ?? []);
+        setIncomingKnocks(d.incoming ?? []);
+      }
+      if (familyRes.ok) {
+        const d = await familyRes.json();
+        const pub = new Set<string>(
+          (d.members ?? [])
+            .filter((m: MemberDTO) => Boolean(m.isRoomPublic))
+            .map((m: MemberDTO) => m.id)
+        );
+        setPublicRoomOwners(pub);
+      }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadCommon();
-  }, [loadCommon, currentMember.id]);
+    loadAll();
+  }, [loadAll]);
 
-  async function handleSaveRoomConfig(patch: Partial<RoomConfigDTO>) {
-    await fetch("/api/rooms", {
-      method: "PATCH",
+  // --- Shared Lists Actions ---
+  async function handleCreateList(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newListTitle.trim()) return;
+    const res = await fetch("/api/lists", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ownerKey: "COMMON", ...patch }),
+      body: JSON.stringify({
+        title: newListTitle.trim(),
+        type: newListIcon,
+        visibility: "FAMILY",
+      }),
     });
-    await loadCommon();
+    if (res.ok) {
+      setNewListTitle("");
+      setNewListOpen(false);
+      await loadAll();
+    }
   }
 
-  async function answerKnock(knockId: string, status: "ALLOWED" | "DECLINED") {
-    await fetch("/api/rooms/knocks", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ knockId, status }),
+  async function handleDeleteList(listId: string) {
+    await fetch(`/api/lists?id=${encodeURIComponent(listId)}`, {
+      method: "DELETE",
     });
-    await loadCommon();
+    await loadAll();
   }
 
-  const theme =
-    ROOM_THEMES[roomConfig?.theme ?? "stone"] ?? ROOM_THEMES.stone;
+  async function handleAddItem(e: React.FormEvent, listId: string) {
+    e.preventDefault();
+    const draft = draftItems[listId];
+    if (!draft?.title.trim()) return;
+    const res = await fetch("/api/lists/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        listId,
+        title: draft.title.trim(),
+        dueDate: draft.dueDate || "",
+        priority: "MEDIUM",
+      }),
+    });
+    if (res.ok) {
+      setDraftItems((prev) => ({
+        ...prev,
+        [listId]: { title: "", dueDate: "" },
+      }));
+      await loadAll();
+    }
+  }
 
-  const DEFAULT_COMMON_BLOCKS: SpaceBlockItem[] = [
-    { id: "blk_social", type: "social", span: 12 },
-    { id: "blk_board", type: "board", span: 12 },
-    { id: "blk_gear", type: "gear", span: 12 },
-    { id: "blk_lists", type: "lists", span: 12 },
-  ];
+  async function handleToggleItem(itemId: string, currentCompleted: boolean) {
+    // Optimistic UI update for snappy check/strikethrough
+    setLists((prev) =>
+      prev.map((l) => ({
+        ...l,
+        items: l.items.map((it) =>
+          it.id === itemId ? { ...it, isCompleted: !currentCompleted } : it
+        ),
+      }))
+    );
+    await fetch("/api/lists/items", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: itemId, isCompleted: !currentCompleted }),
+    });
+  }
 
-  const COMMON_AVAILABLE_BLOCKS: AvailableBlockOption[] = [
-    { type: "board", label: "Common House Board", defaultSpan: 12 },
-    {
-      type: "social",
-      label: "Fridge Meals, Workouts & Votes",
-      defaultSpan: 12,
-    },
-    { type: "gear", label: "Shared House Gear", defaultSpan: 12 },
-    { type: "lists", label: "Shopping & Chore Checklists", defaultSpan: 12 },
-  ];
+  async function handleDeleteItem(itemId: string) {
+    setLists((prev) =>
+      prev.map((l) => ({
+        ...l,
+        items: l.items.filter((it) => it.id !== itemId),
+      }))
+    );
+    await fetch(`/api/lists/items?id=${encodeURIComponent(itemId)}`, {
+      method: "DELETE",
+    });
+  }
 
-  const blocks = normalizeSpaceBlocks(
-    roomConfig?.layout ?? [],
-    DEFAULT_COMMON_BLOCKS
-  );
+  async function handleDropOnList(targetListId: string) {
+    setDragOverListId(null);
+    if (!draggedItem || draggedItem.fromListId === targetListId) {
+      setDraggedItem(null);
+      return;
+    }
+    const { id: itemId, fromListId } = draggedItem;
+    setDraggedItem(null);
+
+    // Optimistic move between lists
+    setLists((prev) => {
+      let movedItem: HouseholdListDTO["items"][number] | null = null;
+      const removed = prev.map((l) => {
+        if (l.id !== fromListId) return l;
+        const found = l.items.find((it) => it.id === itemId);
+        if (found) movedItem = { ...found, listId: targetListId };
+        return { ...l, items: l.items.filter((it) => it.id !== itemId) };
+      });
+      if (!movedItem) return prev;
+      return removed.map((l) =>
+        l.id === targetListId ? { ...l, items: [movedItem!, ...l.items] } : l
+      );
+    });
+
+    await fetch("/api/lists/items", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: itemId, listId: targetListId }),
+    });
+  }
+
+  // --- Door & Knock Actions ---
+  async function handleSendKnock(withMessage: boolean) {
+    if (!knockTarget) return;
+    setKnockSending(true);
+    try {
+      await fetch("/api/rooms/knocks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomOwnerId: knockTarget.id,
+          message: withMessage ? knockMessage.trim() : "",
+        }),
+      });
+      setKnockTarget(null);
+      setKnockMessage("");
+      await loadAll();
+      await onKnocksChanged();
+    } finally {
+      setKnockSending(false);
+    }
+  }
+
+  // --- Add Family Member Action ---
+  async function handleAddMember(e: React.FormEvent) {
+    e.preventDefault();
+    setMemberError(null);
+    setMemberSaving(true);
+    try {
+      const res = await fetch("/api/family/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: memberName.trim(),
+          email: memberEmail.trim(),
+          role: memberRole,
+          avatarId: memberAvatarId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMemberError(data.error ?? "Could not add family member.");
+        return;
+      }
+      setMintedMemberKeycard({
+        name: memberName.trim(),
+        houseKey: data.houseKey ?? household?.houseKey ?? "DOMUS-HOME",
+        roomKey: data.roomKey,
+      });
+      setMemberName("");
+      setMemberEmail("");
+      await onHouseholdChanged();
+      await loadAll();
+    } finally {
+      setMemberSaving(false);
+    }
+  }
+
+  async function copyValue(key: string, val: string) {
+    try {
+      await navigator.clipboard.writeText(val);
+      setCopiedField(key);
+      setTimeout(() => setCopiedField((p) => (p === key ? null : p)), 2000);
+    } catch {
+      // ignore
+    }
+  }
+
+  // --- Calendar Actions ---
+  async function handleSaveCalendarItem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!eventTitle.trim() || !eventDate) return;
+    setEventSaving(true);
+    try {
+      const startTime = `${eventDate}T09:00:00.000Z`;
+      const endTime = `${eventDate}T10:00:00.000Z`;
+      const res = await fetch("/api/calendar/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: eventTitle.trim(),
+          category: eventCategory,
+          startTime,
+          endTime,
+          visibility: "FAMILY",
+          isShared: true,
+          notes: eventNotes.trim(),
+        }),
+      });
+      if (res.ok) {
+        setEventTitle("");
+        setEventNotes("");
+        setEventModalOpen(false);
+        await loadAll();
+      }
+    } finally {
+      setEventSaving(false);
+    }
+  }
+
+  // Build unified calendar entries for the currently displayed month
+  const calendarYear = calCursor.getFullYear();
+  const calendarMonth = calCursor.getMonth();
+
+  const monthDays = useMemo(() => {
+    const firstDay = new Date(calendarYear, calendarMonth, 1);
+    const startOffset = firstDay.getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+    const cells: Array<{ date: Date | null; key: string }> = [];
+    for (let i = 0; i < startOffset; i++) {
+      cells.push({ date: null, key: `empty-${i}` });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dt = new Date(calendarYear, calendarMonth, d);
+      cells.push({ date: dt, key: toDateKey(dt) });
+    }
+    return cells;
+  }, [calendarYear, calendarMonth]);
+
+  const entriesByDate = useMemo(() => {
+    const map: Record<
+      string,
+      Array<{
+        id: string;
+        title: string;
+        kind: "HOLIDAY" | "BIRTHDAY" | "EVENT" | "LIST_ITEM";
+      }>
+    > = {};
+
+    const push = (
+      dateKey: string,
+      entry: {
+        id: string;
+        title: string;
+        kind: "HOLIDAY" | "BIRTHDAY" | "EVENT" | "LIST_ITEM";
+      }
+    ) => {
+      if (!map[dateKey]) map[dateKey] = [];
+      map[dateKey].push(entry);
+    };
+
+    // 1. Public holidays for displayed year
+    for (const h of getPublicHolidaysForYear(calendarYear)) {
+      push(h.date, {
+        id: `hol-${h.date}-${h.title}`,
+        title: h.title,
+        kind: "HOLIDAY",
+      });
+    }
+
+    // 2. Saved family events & birthdays (birthdays automatically recur every year!)
+    for (const ev of events) {
+      const rawDate = ev.startTime.slice(0, 10);
+      if (ev.category === "BIRTHDAY") {
+        const recurringKey = `${calendarYear}-${rawDate.slice(5, 10)}`;
+        push(recurringKey, {
+          id: ev.id,
+          title: ev.title,
+          kind: "BIRTHDAY",
+        });
+      } else {
+        push(rawDate, {
+          id: ev.id,
+          title: ev.title,
+          kind: ev.category === "HOLIDAY" ? "HOLIDAY" : "EVENT",
+        });
+      }
+    }
+
+    // 3. Any shared list item with a date automatically appears on the Family Calendar!
+    for (const list of lists) {
+      for (const item of list.items) {
+        if (item.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(item.dueDate)) {
+          const isBirthday =
+            /birthday|bday/i.test(item.title) ||
+            /birthday|bday/i.test(list.title);
+          const dateKey = isBirthday
+            ? `${calendarYear}-${item.dueDate.slice(5, 10)}`
+            : item.dueDate;
+          push(dateKey, {
+            id: `li-${item.id}`,
+            title: item.title,
+            kind: isBirthday ? "BIRTHDAY" : "LIST_ITEM",
+          });
+        }
+      }
+    }
+
+    return map;
+  }, [calendarYear, events, lists]);
+
+  const todayKey = toDateKey(new Date());
+  const monthLabel = calCursor.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const pendingIncomingCount = incomingKnocks.filter(
+    (k) => k.status === "KNOCKING"
+  ).length;
 
   return (
-    <div className="space-y-6">
-      {/* Incoming Door Knocks Banner */}
-      {incomingKnocks.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="domus-card border-terracotta-300 bg-gradient-to-r from-terracotta-50 to-amber-50/80 p-4"
-        >
-          <div className="space-y-2.5">
-            {incomingKnocks.map((knk) => {
-              const visitor = memberById.get(knk.visitorId);
+    <div className="space-y-8 pb-12">
+      {/* SECTION 1: FAMILY HALLWAY — DOORS FOR EVERY MEMBER */}
+      <section className="domus-card p-6 sm:p-7">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
+              {household?.name ?? "Your Residence"} · Hallway
+            </p>
+            <h2 className="mt-0.5 text-xl font-extrabold tracking-tight text-[#1e1916]">
+              Family Doors
+            </h2>
+            <p className="text-xs text-[#6b5d53]">
+              Step directly into your own room, or knock on a family
+              member&apos;s door to visit.
+            </p>
+          </div>
+
+          {canInvite && (
+            <button
+              type="button"
+              onClick={() => {
+                setMintedMemberKeycard(null);
+                setMemberError(null);
+                setAddMemberOpen(true);
+              }}
+              className="domus-btn-secondary text-xs"
+            >
+              <UserPlus className="h-3.5 w-3.5 text-sage-700" />
+              Add Family Member
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {members.map((m) => {
+            const isMe = m.id === currentMember.id;
+            const isPublic = publicRoomOwners.has(m.id);
+            const myKnock = outgoingKnocks.find((k) => k.roomOwnerId === m.id);
+            const canEnterDirectly =
+              isMe || isPublic || myKnock?.status === "ALLOWED";
+
+            return (
+              <motion.button
+                key={m.id}
+                type="button"
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  if (canEnterDirectly) {
+                    onEnterRoom(m.id);
+                  } else {
+                    setKnockTarget(m);
+                    setKnockMessage("");
+                  }
+                }}
+                className="domus-tile group relative flex flex-col items-center p-4 text-center"
+              >
+                {/* Status badge */}
+                <span
+                  className={`absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    isMe
+                      ? "bg-[#1f332b] text-white"
+                      : canEnterDirectly
+                      ? "bg-sage-100 text-sage-800"
+                      : myKnock?.status === "KNOCKING"
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-[#e7dfd4] text-[#5c5047]"
+                  }`}
+                >
+                  {isMe ? (
+                    pendingIncomingCount > 0 ? (
+                      `${pendingIncomingCount} Knocking`
+                    ) : (
+                      "Your Room"
+                    )
+                  ) : canEnterDirectly ? (
+                    <>
+                      <DoorOpen className="h-3 w-3" /> Open
+                    </>
+                  ) : myKnock?.status === "KNOCKING" ? (
+                    "Knocking..."
+                  ) : (
+                    <>
+                      <DoorClosed className="h-3 w-3" /> Knock
+                    </>
+                  )}
+                </span>
+
+                {/* 2.5D Door Illustration + Member Avatar */}
+                <div className="relative mt-4 mb-2.5 flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/assets/door-3d.png"
+                    alt={`${m.name}'s door`}
+                    className="h-20 w-20 rounded-2xl object-contain mix-blend-multiply transition-transform duration-200 group-hover:scale-105"
+                  />
+                  <div className="absolute -bottom-1 -right-1 rounded-full ring-2 ring-[#faf7f2]">
+                    <MemberAvatar
+                      initials={m.avatarInitials}
+                      color={m.color}
+                      avatarId={m.avatarId}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-sm font-bold text-[#1e1916]">{m.name}</p>
+                <p className="text-[11px] font-medium text-[#6b5d53]">
+                  {isMe
+                    ? "Enter directly"
+                    : canEnterDirectly
+                    ? "Step inside"
+                    : "Click to knock"}
+                </p>
+              </motion.button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* SECTION 2: UNRESTRICTED SHARED FAMILY LISTS (DRAG & DROP + CHECK/STRIKETHROUGH) */}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-[#1e1916]">
+              <ListChecks className="h-5 w-5 text-terracotta-500" />
+              Shared Family Lists
+            </h2>
+            <p className="text-xs text-[#6b5d53]">
+              Create any list for the whole home — groceries, meal prep,
+              errands, birthdays. Drag items between lists and check them off
+              when done.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setNewListOpen((v) => !v)}
+            className="domus-btn-accent text-xs"
+          >
+            <Plus className="h-4 w-4" />
+            New Shared List
+          </button>
+        </div>
+
+        {/* Inline New List Creator */}
+        <AnimatePresence>
+          {newListOpen && (
+            <motion.form
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              onSubmit={handleCreateList}
+              className="domus-card space-y-4 p-5 sm:p-6"
+            >
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-[220px] flex-1">
+                  <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                    List Name <span className="text-terracotta-500">*</span>
+                  </label>
+                  <input
+                    autoFocus
+                    required
+                    value={newListTitle}
+                    onChange={(e) => setNewListTitle(e.target.value)}
+                    placeholder="e.g., Weekly Groceries, Meal Prep, Relative Birthdays..."
+                    className="domus-input"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewListOpen(false);
+                      setNewListTitle("");
+                    }}
+                    className="domus-btn-secondary py-2.5 text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="domus-btn-accent py-2.5 text-xs"
+                  >
+                    Create List
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-bold text-[#6b5d53]">
+                  Pick an Icon (Optional)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {LIST_ICON_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setNewListIcon(opt.src)}
+                      className={`flex items-center gap-1.5 rounded-2xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+                        newListIcon === opt.src
+                          ? "border-terracotta-500 bg-terracotta-50 text-[#1e1916]"
+                          : "border-transparent bg-[#f3ede4] text-[#5c5047] hover:bg-[#eae0d3]"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={opt.src}
+                        alt={opt.label}
+                        className="h-5 w-5 object-contain mix-blend-multiply"
+                      />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.form>
+          )}
+        </AnimatePresence>
+
+        {/* Lists Grid */}
+        {loading ? (
+          <div className="domus-card p-8 text-center text-xs text-[#6b5d53]">
+            Loading shared lists...
+          </div>
+        ) : lists.length === 0 ? (
+          <div className="domus-card flex flex-col items-center justify-center gap-3 p-10 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/board-3d.png"
+              alt="Shared lists"
+              className="h-20 w-20 object-contain mix-blend-multiply"
+            />
+            <div>
+              <h3 className="text-base font-bold text-[#1e1916]">
+                No shared lists yet
+              </h3>
+              <p className="mt-1 max-w-sm text-xs text-[#6b5d53]">
+                Start your first shared list — like Groceries, Weekly Meal Prep,
+                Chores, or Family Birthdays. Everyone in the house sees and
+                updates it together.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNewListOpen(true)}
+              className="domus-btn-accent mt-1 text-xs"
+            >
+              <Plus className="h-4 w-4" />
+              Create Your First List
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {lists.map((list) => {
+              const draft = draftItems[list.id] ?? { title: "", dueDate: "" };
+              const isDropTarget = dragOverListId === list.id;
+
               return (
                 <div
-                  key={knk.id}
-                  className="flex flex-wrap items-center justify-between gap-3"
+                  key={list.id}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragOverListId !== list.id) setDragOverListId(list.id);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverListId === list.id) setDragOverListId(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDropOnList(list.id);
+                  }}
+                  className={`domus-card flex flex-col justify-between p-5 transition-all ${
+                    isDropTarget
+                      ? "ring-2 ring-terracotta-500 scale-[1.01]"
+                      : ""
+                  }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-terracotta-500 text-white shadow-sm">
-                      <BellRing className="h-4 w-4" />
+                  <div className="space-y-4">
+                    {/* List Header */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={getListIconSrc(list.type)}
+                          alt={list.title}
+                          className="h-9 w-9 shrink-0 object-contain mix-blend-multiply"
+                        />
+                        <div>
+                          <h3 className="text-sm font-extrabold text-[#1e1916]">
+                            {list.title}
+                          </h3>
+                          <p className="text-[11px] text-[#6b5d53]">
+                            {list.items.filter((i) => !i.isCompleted).length}{" "}
+                            remaining · {list.items.length} total
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteList(list.id)}
+                        title="Delete list"
+                        className="rounded-xl p-1.5 text-[#8a7c71] transition hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-stone-900">
-                        {visitor?.name ?? "Someone"} is knocking on your room
-                        door!
-                      </p>
-                      <p className="text-xs text-stone-600">“{knk.message}”</p>
+
+                    {/* Draggable Items */}
+                    <div className="space-y-2">
+                      {list.items.length === 0 ? (
+                        <p className="rounded-2xl border border-dashed border-[#dfd4c6] px-3 py-4 text-center text-xs text-[#8a7c71]">
+                          Add an item below or drag one here from another list.
+                        </p>
+                      ) : (
+                        list.items.map((item) => (
+                          <div
+                            key={item.id}
+                            draggable
+                            onDragStart={() =>
+                              setDraggedItem({
+                                id: item.id,
+                                fromListId: list.id,
+                              })
+                            }
+                            onDragEnd={() => {
+                              setDraggedItem(null);
+                              setDragOverListId(null);
+                            }}
+                            className={`group flex cursor-grab items-center gap-2.5 rounded-2xl bg-[#f3ede4] px-3 py-2.5 transition active:cursor-grabbing ${
+                              item.isCompleted ? "opacity-60" : ""
+                            }`}
+                          >
+                            <GripVertical className="h-3.5 w-3.5 shrink-0 text-[#a09184]" />
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleToggleItem(item.id, item.isCompleted)
+                              }
+                              aria-label={
+                                item.isCompleted
+                                  ? "Mark incomplete"
+                                  : "Mark done"
+                              }
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border-2 transition ${
+                                item.isCompleted
+                                  ? "border-sage-600 bg-sage-600 text-white"
+                                  : "border-[#b8aa9c] bg-white hover:border-terracotta-500"
+                              }`}
+                            >
+                              {item.isCompleted && (
+                                <Check className="h-3 w-3 stroke-[3]" />
+                              )}
+                            </button>
+
+                            <div className="min-w-0 flex-1">
+                              <p
+                                className={`truncate text-xs font-semibold ${
+                                  item.isCompleted
+                                    ? "text-[#7c6e63] line-through"
+                                    : "text-[#1e1916]"
+                                }`}
+                              >
+                                {item.title}
+                              </p>
+                              {item.dueDate && (
+                                <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-terracotta-600">
+                                  <CalendarIcon className="h-2.5 w-2.5" />
+                                  {item.dueDate}
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(item.id)}
+                              title="Remove item"
+                              className="rounded-lg p-1 text-[#8a7c71] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => answerKnock(knk.id, "ALLOWED")}
-                      className="domus-btn-accent px-3 py-1.5 text-xs"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      Let In
-                    </button>
-                    <button
-                      onClick={() => answerKnock(knk.id, "DECLINED")}
-                      className="domus-btn-secondary px-3 py-1.5 text-xs"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      Not Now
-                    </button>
-                  </div>
+
+                  {/* Inline Add Item Row (with optional date that auto-syncs to Family Calendar!) */}
+                  <form
+                    onSubmit={(e) => handleAddItem(e, list.id)}
+                    className="mt-4 space-y-2 border-t border-[#e8dfd3] pt-3.5"
+                  >
+                    <div className="flex gap-2">
+                      <input
+                        value={draft.title}
+                        onChange={(e) =>
+                          setDraftItems((prev) => ({
+                            ...prev,
+                            [list.id]: { ...draft, title: e.target.value },
+                          }))
+                        }
+                        placeholder="Add an item..."
+                        className="domus-input py-2 text-xs"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!draft.title.trim()}
+                        className="domus-btn-primary shrink-0 px-3 py-2 text-xs disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="flex items-center gap-1.5 text-[10px] font-semibold text-[#7c6e63]">
+                        <CalendarIcon className="h-3 w-3" />
+                        Optional date (shows on Calendar):
+                      </label>
+                      <input
+                        type="date"
+                        value={draft.dueDate}
+                        onChange={(e) =>
+                          setDraftItems((prev) => ({
+                            ...prev,
+                            [list.id]: { ...draft, dueDate: e.target.value },
+                          }))
+                        }
+                        className="rounded-lg border border-[#dfd4c6] bg-white/80 px-2 py-0.5 text-[11px] font-medium text-[#4e433b]"
+                      />
+                    </div>
+                  </form>
                 </div>
               );
             })}
           </div>
-        </motion.div>
-      )}
+        )}
+      </section>
 
-      {/* 2.5D Freeform Decoratable Common Living Room Hero */}
-      {roomConfig && (
-        <FreeformDecorCanvas config={roomConfig} onSave={handleSaveRoomConfig}>
-          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
-            <div className="flex items-start gap-4">
-              <motion.div
-                whileHover={{ y: -4, rotate: -2 }}
-                className="hidden h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-[#faf9f5] shadow-md sm:block"
-                style={{
-                  boxShadow:
-                    "0 5px 0 0 rgba(202,187,165,0.85), 0 14px 24px -10px rgba(25,21,18,0.22)",
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/assets/house-hero.png"
-                  alt="Domus Home"
-                  className="h-full w-full object-cover"
-                />
-              </motion.div>
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-terracotta-600">
-                  Common Area · Shared House Wall
-                </p>
-                <h2
-                  className={`mt-1 text-2xl font-bold tracking-tight sm:text-3xl ${
-                    theme.dark ? "text-white" : "text-stone-900"
-                  }`}
-                >
-                  {roomConfig.roomTitle}
-                </h2>
-                <p
-                  className={`mt-1 max-w-xl text-sm ${
-                    theme.dark ? "text-stone-300" : "text-stone-600"
-                  }`}
-                >
-                  {roomConfig.bannerQuote ||
-                    "Pick up unclaimed chores, pin sticky notes, drag tasks across columns, and decorate anywhere on this wall."}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2.5">
-              <button
-                onClick={() => onNavigate("room")}
-                className="domus-btn-primary whitespace-nowrap"
-              >
-                <DoorOpen className="h-4 w-4" />
-                Enter My Room
-              </button>
-              <button
-                onClick={() => onNavigate("calendar")}
-                className="domus-btn-accent whitespace-nowrap"
-              >
-                <CalendarClock className="h-4 w-4" />
-                Calendar &amp; Booking
-              </button>
+      {/* SECTION 3: FAMILY CALENDAR (HOLIDAYS, BIRTHDAYS & SAVED FAMILY DATES) */}
+      <section className="domus-card p-6 sm:p-7">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/calendar-3d.png"
+              alt="Family Calendar"
+              className="h-12 w-12 shrink-0 object-contain mix-blend-multiply"
+            />
+            <div>
+              <h2 className="text-xl font-extrabold tracking-tight text-[#1e1916]">
+                Family Calendar
+              </h2>
+              <p className="text-xs text-[#6b5d53]">
+                Public holidays, family &amp; relative birthdays, and any dated
+                items from your shared lists. Click any day to add.
+              </p>
             </div>
           </div>
-        </FreeformDecorCanvas>
-      )}
 
-      {/* Modular Drag-and-Drop Common Space Builder (Arrange Boards, Meals, Votes, Gear, Lists & Custom Notes Anywhere!) */}
-      <SpaceBuilder
-        blocks={blocks}
-        availableBlocks={COMMON_AVAILABLE_BLOCKS}
-        onChangeBlocks={(next) => handleSaveRoomConfig({ layout: next })}
-        renderBlock={(block) => {
-          if (block.type === "gear") {
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-2xl bg-[#f3ede4] p-1">
+              <button
+                type="button"
+                onClick={() =>
+                  setCalCursor(new Date(calendarYear, calendarMonth - 1, 1))
+                }
+                className="rounded-xl p-1.5 text-[#4e433b] hover:bg-white"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-[130px] text-center text-xs font-extrabold text-[#1e1916]">
+                {monthLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCalCursor(new Date(calendarYear, calendarMonth + 1, 1))
+                }
+                className="rounded-xl p-1.5 text-[#4e433b] hover:bg-white"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                setCalCursor(new Date(now.getFullYear(), now.getMonth(), 1));
+              }}
+              className="domus-btn-secondary py-2 text-xs"
+            >
+              Today
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEventDate(todayKey);
+                setEventCategory("BIRTHDAY");
+                setEventTitle("");
+                setEventNotes("");
+                setEventModalOpen(true);
+              }}
+              className="domus-btn-accent py-2 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Event / Birthday
+            </button>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-[#6b5d53]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+            Public Holidays
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+            Birthdays (Yearly)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-sage-600" />
+            Family Events
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+            From Shared Lists
+          </span>
+        </div>
+
+        {/* Month Grid */}
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <div
+              key={day}
+              className="py-1.5 text-center text-[11px] font-bold uppercase tracking-wider text-[#7c6e63]"
+            >
+              {day}
+            </div>
+          ))}
+
+          {monthDays.map((cell) => {
+            if (!cell.date) {
+              return (
+                <div
+                  key={cell.key}
+                  className="min-h-[84px] rounded-2xl bg-[#f3ede4]/35 sm:min-h-[96px]"
+                />
+              );
+            }
+
+            const dayEntries = entriesByDate[cell.key] ?? [];
+            const isToday = cell.key === todayKey;
+
             return (
-              <div className="domus-card space-y-3 p-5">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-terracotta-500" />
-                  <h3 className="text-sm font-bold text-stone-900">
-                    Shared House Gear
-                  </h3>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {resources.map((res) => (
-                    <TiltCard
-                      key={res.id}
-                      maxTilt={6}
-                      lift={4}
-                      className="flex items-center gap-3 p-3"
+              <button
+                key={cell.key}
+                type="button"
+                onClick={() => {
+                  setEventDate(cell.key);
+                  setEventCategory("FAMILY");
+                  setEventTitle("");
+                  setEventNotes("");
+                  setEventModalOpen(true);
+                }}
+                className={`flex min-h-[84px] flex-col items-start gap-1 rounded-2xl p-2 text-left transition sm:min-h-[96px] ${
+                  isToday
+                    ? "bg-terracotta-50 ring-2 ring-terracotta-500"
+                    : "bg-[#f3ede4]/75 hover:bg-[#ece3d6]"
+                }`}
+              >
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                    isToday
+                      ? "bg-terracotta-500 text-white"
+                      : "text-[#3d342e]"
+                  }`}
+                >
+                  {cell.date.getDate()}
+                </span>
+
+                <div className="w-full space-y-1">
+                  {dayEntries.slice(0, 3).map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`truncate rounded-lg px-1.5 py-0.5 text-[10px] font-bold ${
+                        entry.kind === "HOLIDAY"
+                          ? "bg-sky-100 text-sky-900"
+                          : entry.kind === "BIRTHDAY"
+                          ? "bg-rose-100 text-rose-900"
+                          : entry.kind === "LIST_ITEM"
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-sage-100 text-sage-900"
+                      }`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={res.iconAsset}
-                        alt={res.name}
-                        className="h-12 w-12 shrink-0 rounded-xl bg-[#faf9f5] object-cover shadow-sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <span
-                          className={`text-[10px] font-bold uppercase ${
-                            res.status === "AVAILABLE"
-                              ? "text-sage-600"
-                              : "text-terracotta-600"
-                          }`}
-                        >
-                          {res.status === "AVAILABLE" ? "Free Now" : "In Use"}
-                        </span>
-                        <p className="truncate text-xs font-bold text-stone-900">
-                          {res.name}
-                        </p>
-                        <p className="truncate text-[10px] text-stone-500">
-                          {res.currentEventTitle
-                            ? res.currentEventTitle
-                            : res.nextBooking
-                              ? `Next: ${formatShortDate(res.nextBooking.startTime)}`
-                              : "Open to reserve"}
-                        </p>
-                      </div>
-                    </TiltCard>
+                      {entry.kind === "BIRTHDAY" ? "🎂 " : ""}
+                      {entry.title}
+                    </div>
                   ))}
+                  {dayEntries.length > 3 && (
+                    <p className="px-1 text-[10px] font-bold text-[#6b5d53]">
+                      +{dayEntries.length - 3} more
+                    </p>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* MODAL 1: KNOCK ON A FAMILY MEMBER'S DOOR (Quiet Knock OR With Message) */}
+      <AnimatePresence>
+        {knockTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setKnockTarget(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              onClick={(e) => e.stopPropagation()}
+              className="domus-card relative w-full max-w-md space-y-5 p-6 sm:p-7"
+            >
+              <button
+                type="button"
+                onClick={() => setKnockTarget(null)}
+                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] hover:bg-[#e5d9ca]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <MemberAvatar
+                  initials={knockTarget.avatarInitials}
+                  color={knockTarget.color}
+                  avatarId={knockTarget.avatarId}
+                  size="md"
+                />
+                <div>
+                  <h3 className="text-base font-extrabold text-[#1e1916]">
+                    Knock on {knockTarget.name}&apos;s Door
+                  </h3>
+                  <p className="text-xs text-[#6b5d53]">
+                    {knockTarget.name} will see your knock and can let you in.
+                  </p>
                 </div>
               </div>
-            );
-          }
 
-          if (block.type === "social") {
-            return (
-              <CommonSocialHub
-                currentMember={currentMember}
-                members={members}
-              />
-            );
-          }
-
-          if (block.type === "board" && board) {
-            return (
-              <div className="domus-card p-5">
-                <InteractiveBoard
-                  board={board}
-                  columns={columns}
-                  cards={cards}
-                  members={members}
-                  resources={resources}
-                  currentMember={currentMember}
-                  onRefresh={loadCommon}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                  Add a Note (Optional)
+                </label>
+                <input
+                  autoFocus
+                  value={knockMessage}
+                  onChange={(e) => setKnockMessage(e.target.value)}
+                  placeholder="e.g., Dinner's ready! or Quick question..."
+                  className="domus-input"
                 />
               </div>
-            );
-          }
 
-          if (block.type === "lists") {
-            return (
-              <div className="domus-card p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-stone-900">
-                      Shared Shopping, Meal Prep &amp; Chore Checklists
-                    </h3>
-                    <p className="text-xs text-stone-500">
-                      Quick check-off lists for groceries &amp; home upkeep
-                    </p>
+              <div className="flex flex-col gap-2.5 sm:flex-row">
+                <button
+                  type="button"
+                  disabled={knockSending}
+                  onClick={() => handleSendKnock(false)}
+                  className="domus-btn-secondary flex-1 py-2.5 text-xs"
+                >
+                  <Hand className="h-3.5 w-3.5 text-terracotta-500" />
+                  Knock Quietly (No Note)
+                </button>
+                <button
+                  type="button"
+                  disabled={knockSending || !knockMessage.trim()}
+                  onClick={() => handleSendKnock(true)}
+                  className="domus-btn-accent flex-1 py-2.5 text-xs disabled:opacity-45"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Knock with Note
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 2: ADD FAMILY MEMBER (Auto-Mints Room Key + Welcome Keycard) */}
+      <AnimatePresence>
+        {addMemberOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              if (!mintedMemberKeycard) setAddMemberOpen(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              onClick={(e) => e.stopPropagation()}
+              className="domus-card relative w-full max-w-md space-y-5 p-6 sm:p-7"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setAddMemberOpen(false);
+                  setMintedMemberKeycard(null);
+                }}
+                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] hover:bg-[#e5d9ca]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              {mintedMemberKeycard ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sage-100 text-sage-700">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-sage-700">
+                        Door Ready · Share Keys
+                      </p>
+                      <h3 className="text-base font-extrabold text-[#1e1916]">
+                        {mintedMemberKeycard.name}&apos;s Keys
+                      </h3>
+                    </div>
                   </div>
+
+                  <div className="space-y-3 rounded-2xl bg-[#f3ece2] p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#6b5d53]">
+                          House Key
+                        </p>
+                        <p className="font-mono text-sm font-extrabold text-[#1e1916]">
+                          {mintedMemberKeycard.houseKey}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyValue("mHouse", mintedMemberKeycard.houseKey)
+                        }
+                        className="domus-btn-secondary px-2.5 py-1.5 text-xs"
+                      >
+                        {copiedField === "mHouse" ? (
+                          <Check className="h-3.5 w-3.5 text-sage-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="border-t border-[#e2d7c8]" />
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#6b5d53]">
+                          {mintedMemberKeycard.name}&apos;s Personal Room Key
+                        </p>
+                        <p className="font-mono text-sm font-extrabold text-[#1e1916]">
+                          {mintedMemberKeycard.roomKey}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyValue("mRoom", mintedMemberKeycard.roomKey)
+                        }
+                        className="domus-btn-secondary px-2.5 py-1.5 text-xs"
+                      >
+                        {copiedField === "mRoom" ? (
+                          <Check className="h-3.5 w-3.5 text-sage-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
                   <button
-                    onClick={() => setShowLists((v) => !v)}
-                    className="domus-btn-secondary whitespace-nowrap text-xs"
+                    type="button"
+                    onClick={() => {
+                      setAddMemberOpen(false);
+                      setMintedMemberKeycard(null);
+                    }}
+                    className="domus-btn-accent w-full py-2.5 text-xs"
                   >
-                    {showLists ? "Hide Checklists" : "Open Checklists"}
+                    Done
                   </button>
                 </div>
-                {showLists && (
-                  <div className="mt-5 border-t border-stone-100 pt-5">
-                    <ListsView
-                      currentMember={currentMember}
-                      members={members}
+              ) : (
+                <form onSubmit={handleAddMember} className="space-y-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-[#1e1916]">
+                      Add a Family Member
+                    </h3>
+                    <p className="mt-0.5 text-xs text-[#6b5d53]">
+                      We&apos;ll create their private door and automatically
+                      mint their personal Room Key.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                      Name <span className="text-terracotta-500">*</span>
+                    </label>
+                    <input
+                      autoFocus
+                      required
+                      value={memberName}
+                      onChange={(e) => setMemberName(e.target.value)}
+                      placeholder="e.g., Meera"
+                      className="domus-input"
                     />
                   </div>
-                )}
-              </div>
-            );
-          }
 
-          return null;
-        }}
-      />
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                      Recovery Email{" "}
+                      <span className="text-terracotta-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={memberEmail}
+                      onChange={(e) => setMemberEmail(e.target.value)}
+                      placeholder="For key recovery"
+                      className="domus-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                      Role <span className="text-terracotta-500">*</span>
+                    </label>
+                    <select
+                      value={memberRole}
+                      onChange={(e) => setMemberRole(e.target.value as Role)}
+                      className="domus-input"
+                    >
+                      {(["CO_HEAD", "MEMBER", "JUNIOR", "GUEST"] as Role[]).map(
+                        (r) => (
+                          <option key={r} value={r}>
+                            {ROLE_META[r].label} — {ROLE_META[r].description}
+                          </option>
+                        )
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-[#4e433b]">
+                      Avatar
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {AVATAR_PRESETS.slice(0, 7).map((av) => (
+                        <button
+                          key={av.id}
+                          type="button"
+                          onClick={() => setMemberAvatarId(av.id)}
+                          className={`rounded-full p-0.5 transition ${
+                            memberAvatarId === av.id
+                              ? "ring-2 ring-[#1f332b]"
+                              : "opacity-75 hover:opacity-100"
+                          }`}
+                        >
+                          <MemberAvatar
+                            initials={av.label.slice(0, 2)}
+                            color={av.ring}
+                            avatarId={av.id}
+                            size="sm"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {memberError && (
+                    <p className="rounded-2xl bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700">
+                      {memberError}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setAddMemberOpen(false)}
+                      className="domus-btn-secondary flex-1 py-2.5 text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={memberSaving}
+                      className="domus-btn-accent flex-1 py-2.5 text-xs"
+                    >
+                      {memberSaving ? "Minting Key..." : "Add & Mint Key"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 3: ADD EVENT OR BIRTHDAY TO FAMILY CALENDAR */}
+      <AnimatePresence>
+        {eventModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setEventModalOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#1d1714]/40 p-4 backdrop-blur-md"
+          >
+            <motion.form
+              initial={{ opacity: 0, scale: 0.94, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={handleSaveCalendarItem}
+              className="domus-card relative w-full max-w-md space-y-4 p-6 sm:p-7"
+            >
+              <button
+                type="button"
+                onClick={() => setEventModalOpen(false)}
+                className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#efe7dc] text-[#5c5047] hover:bg-[#e5d9ca]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div>
+                <h3 className="text-base font-extrabold text-[#1e1916]">
+                  Add to Family Calendar
+                </h3>
+                <p className="mt-0.5 text-xs text-[#6b5d53]">
+                  Save a birthday (recurs every year), holiday, or family plan.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    {
+                      id: "BIRTHDAY",
+                      label: "Birthday",
+                      icon: <Cake className="h-3.5 w-3.5" />,
+                    },
+                    {
+                      id: "FAMILY",
+                      label: "Family Plan",
+                      icon: <CalendarIcon className="h-3.5 w-3.5" />,
+                    },
+                    {
+                      id: "HOLIDAY",
+                      label: "Holiday",
+                      icon: <Sparkles className="h-3.5 w-3.5" />,
+                    },
+                  ] as const
+                ).map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setEventCategory(cat.id)}
+                    className={`flex items-center justify-center gap-1.5 rounded-2xl py-2.5 text-xs font-bold transition ${
+                      eventCategory === cat.id
+                        ? "bg-[#1f332b] text-white shadow-sm"
+                        : "bg-[#f3ede4] text-[#5c5047] hover:bg-[#e8dfd3]"
+                    }`}
+                  >
+                    {cat.icon}
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                  Title <span className="text-terracotta-500">*</span>
+                </label>
+                <input
+                  autoFocus
+                  required
+                  value={eventTitle}
+                  onChange={(e) => setEventTitle(e.target.value)}
+                  placeholder={
+                    eventCategory === "BIRTHDAY"
+                      ? "e.g., Aunt Priya's Birthday"
+                      : "e.g., Sunday Family Dinner"
+                  }
+                  className="domus-input"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                  Date <span className="text-terracotta-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  className="domus-input"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#4e433b]">
+                  Notes (Optional)
+                </label>
+                <input
+                  value={eventNotes}
+                  onChange={(e) => setEventNotes(e.target.value)}
+                  placeholder="Gift ideas, time, location..."
+                  className="domus-input"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEventModalOpen(false)}
+                  className="domus-btn-secondary flex-1 py-2.5 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={eventSaving}
+                  className="domus-btn-accent flex-1 py-2.5 text-xs"
+                >
+                  {eventSaving ? "Saving..." : "Save to Calendar"}
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

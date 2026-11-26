@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { householdLists, listItems } from "@/db/schema";
 import { getCurrentMember } from "@/lib/auth";
@@ -41,9 +41,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!can(actor, "list:create_or_delete")) {
+  if (actor.role === "GUEST" && !can(actor, "list:create_or_delete")) {
     return NextResponse.json(
-      { error: "Your role does not have permission to create new household lists." },
+      { error: "Guests cannot create new shared lists." },
       { status: 403 }
     );
   }
@@ -72,4 +72,28 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ id }, { status: 201 });
+}
+
+export async function DELETE(request: Request) {
+  const actor = await getCurrentMember();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (actor.role === "GUEST") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "List id required" }, { status: 400 });
+  }
+  await db
+    .delete(householdLists)
+    .where(
+      and(
+        eq(householdLists.id, id),
+        eq(householdLists.householdId, actor.householdId)
+      )
+    );
+  return NextResponse.json({ ok: true });
 }

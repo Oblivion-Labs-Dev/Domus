@@ -3,30 +3,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Calendar,
+  ArrowLeft,
+  Bell,
   Check,
-  Compass,
   Copy,
   DoorOpen,
   Home,
   KeyRound,
-  LayoutGrid,
   LogOut,
-  Palette,
+  Paintbrush,
   Shield,
-  Users,
+  X,
 } from "lucide-react";
-import { GLOBAL_PALETTES, GlobalPaletteId } from "@/lib/palettes";
+import { WALL_PAINTS, WallPaintId } from "@/lib/palettes";
 import { MemberContext, ROLE_META } from "@/lib/rbac";
-import CalendarView from "./CalendarView";
 import CommonAreaView from "./CommonAreaView";
-import FamilyView from "./FamilyView";
-import HouseEntryway from "./HouseEntryway";
-import HouseTour from "./HouseTour";
 import LoginView from "./LoginView";
 import MemberAvatar from "./MemberAvatar";
 import PersonalRoomView from "./PersonalRoomView";
-import { ActiveTab, HouseholdDTO, MemberDTO, RoomKnockDTO } from "./types";
+import { HouseholdDTO, MemberDTO, RoomKnockDTO } from "./types";
 
 interface SessionState {
   loading: boolean;
@@ -46,49 +41,51 @@ export default function DomusApp() {
     members: [],
     isDemoHouse: false,
   });
-  const [activeTab, setActiveTab] = useState<ActiveTab>("entry");
-  const [visitingRoomOwnerId, setVisitingRoomOwnerId] = useState<string | null>(
-    null
-  );
-  const [bookMemberId, setBookMemberId] = useState<string | undefined>(
-    undefined
-  );
-  const [knockCount, setKnockCount] = useState(0);
-  const [tourOpen, setTourOpen] = useState(false);
-  const [palette, setPalette] = useState<GlobalPaletteId>("botanical");
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [copiedHouseKey, setCopiedHouseKey] = useState(false);
 
-  async function handleCopyHeaderKey(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!session.household?.houseKey) return;
-    try {
-      await navigator.clipboard.writeText(session.household.houseKey);
-      setCopiedHouseKey(true);
-      setTimeout(() => setCopiedHouseKey(false), 2000);
-    } catch {
-      // ignore
-    }
-  }
+  // Spatial navigation: directly inside Common Area, or inside a Room (yours or someone you were let into)
+  const [inRoomOwnerId, setInRoomOwnerId] = useState<string | null>(null);
+
+  // Live incoming knocks on YOUR door
+  const [incomingKnocks, setIncomingKnocks] = useState<RoomKnockDTO[]>([]);
+  const [knocksOpen, setKnocksOpen] = useState(false);
+
+  // Wall Paint selector
+  const [wallPaint, setWallPaint] = useState<WallPaintId>("plaster");
+  const [paintOpen, setPaintOpen] = useState(false);
+
+  const [copiedHouseKey, setCopiedHouseKey] = useState(false);
 
   useEffect(() => {
     const saved =
       typeof window !== "undefined"
-        ? (window.localStorage.getItem("domus_palette") as GlobalPaletteId | null)
+        ? (window.localStorage.getItem("domus_wall_paint") as WallPaintId | null)
         : null;
-    const initial = saved ?? "botanical";
-    setPalette(initial);
-    document.documentElement.setAttribute("data-palette", initial);
+    const initial =
+      saved && WALL_PAINTS.some((p) => p.id === saved) ? saved : "plaster";
+    setWallPaint(initial);
+    document.documentElement.setAttribute("data-paint", initial);
   }, []);
 
-  function handleSelectPalette(next: GlobalPaletteId) {
-    setPalette(next);
-    document.documentElement.setAttribute("data-palette", next);
+  function handleSelectPaint(next: WallPaintId) {
+    setWallPaint(next);
+    document.documentElement.setAttribute("data-paint", next);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("domus_palette", next);
+      window.localStorage.setItem("domus_wall_paint", next);
     }
-    setPaletteOpen(false);
+    setPaintOpen(false);
   }
+
+  const refreshKnocks = useCallback(async () => {
+    try {
+      const kRes = await fetch("/api/rooms/knocks", { cache: "no-store" });
+      if (kRes.ok) {
+        const kd = await kRes.json();
+        setIncomingKnocks(kd.incoming ?? []);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const loadSession = useCallback(async () => {
     try {
@@ -104,23 +101,35 @@ export default function DomusApp() {
       });
 
       if (data.authenticated && data.member) {
-        const kRes = await fetch("/api/rooms/knocks", { cache: "no-store" });
-        if (kRes.ok) {
-          const kd = await kRes.json();
-          const pending = (kd.incoming ?? []).filter(
-            (k: RoomKnockDTO) => k.status === "KNOCKING"
-          ).length;
-          setKnockCount(pending);
-        }
+        await refreshKnocks();
       }
     } catch {
       setSession((prev) => ({ ...prev, loading: false }));
     }
-  }, []);
+  }, [refreshKnocks]);
 
   useEffect(() => {
     loadSession();
   }, [loadSession]);
+
+  // Poll gently for incoming door knocks every 12s while authenticated
+  useEffect(() => {
+    if (!session.authenticated) return;
+    const timer = setInterval(refreshKnocks, 12000);
+    return () => clearInterval(timer);
+  }, [session.authenticated, refreshKnocks]);
+
+  async function handleRespondKnock(
+    knockId: string,
+    status: "ALLOWED" | "DECLINED"
+  ) {
+    await fetch("/api/rooms/knocks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ knockId, status }),
+    });
+    await refreshKnocks();
+  }
 
   async function handleDemoRoleSwitch(memberId: string) {
     await fetch("/api/auth/login", {
@@ -128,44 +137,44 @@ export default function DomusApp() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ demoSwitchMemberId: memberId }),
     });
-    setVisitingRoomOwnerId(null);
+    setInRoomOwnerId(null);
     await loadSession();
   }
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    setVisitingRoomOwnerId(null);
+    setInRoomOwnerId(null);
     await loadSession();
   }
 
-  function handleNavigate(tab: ActiveTab, preselectBookMemberId?: string) {
-    if (tab === "room") {
-      setVisitingRoomOwnerId(null);
+  async function handleCopyHeaderKey(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!session.household?.houseKey) return;
+    try {
+      await navigator.clipboard.writeText(session.household.houseKey);
+      setCopiedHouseKey(true);
+      setTimeout(() => setCopiedHouseKey(false), 2000);
+    } catch {
+      // ignore
     }
-    setBookMemberId(preselectBookMemberId);
-    setActiveTab(tab);
-  }
-
-  function handleVisitRoom(memberId: string) {
-    setVisitingRoomOwnerId(memberId);
-    setActiveTab("room");
   }
 
   if (session.loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-stone-500">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-[#5c5047]">
         <motion.div
-          animate={{ rotate: [0, 8, -8, 0], y: [0, -6, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-900 text-white"
+          animate={{ y: [0, -6, 0] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl text-white"
           style={{
+            background: "linear-gradient(145deg, #ec704b 0%, #cf4e2a 100%)",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.2), 0 5px 0 0 #0b0a08, 0 14px 24px -6px rgba(25,23,20,0.35)",
+              "0 12px 22px -6px rgba(217, 83, 47, 0.45), inset 0 2px 4px rgba(255,255,255,0.45)",
           }}
         >
           <Home className="h-5 w-5" />
         </motion.div>
-        <p className="font-medium">Opening Domus...</p>
+        <p className="font-semibold">Opening Domus...</p>
       </div>
     );
   }
@@ -175,205 +184,244 @@ export default function DomusApp() {
   }
 
   const currentMember = session.member;
-
-  const navItems: Array<{
-    id: ActiveTab;
-    label: string;
-    icon: React.ReactNode;
-    badge?: number;
-  }> = [
-    {
-      id: "common",
-      label: "Common Area",
-      icon: <LayoutGrid className="h-4 w-4 shrink-0" />,
-    },
-    {
-      id: "room",
-      label: "My Room",
-      icon: <DoorOpen className="h-4 w-4 shrink-0" />,
-      badge: knockCount > 0 ? knockCount : undefined,
-    },
-    {
-      id: "calendar",
-      label: "Calendar",
-      icon: <Calendar className="h-4 w-4 shrink-0" />,
-    },
-    {
-      id: "family",
-      label: "Family & Doors",
-      icon: <Users className="h-4 w-4 shrink-0" />,
-    },
-  ];
+  const pendingKnocks = incomingKnocks.filter((k) => k.status === "KNOCKING");
+  const memberById = Object.fromEntries(session.members.map((m) => [m.id, m]));
 
   return (
     <div className="min-h-screen">
-      {/* Guided Interactive 2.5D House Tour */}
-      <HouseTour
-        open={tourOpen}
-        onClose={() => setTourOpen(false)}
-        onNavigate={(tab) => handleNavigate(tab)}
-      />
-
-      {/* Rich Sculpted 2.5D Header Bar (adapts to active palette!) */}
+      {/* Clean Minimal Spatial Header (NO top nav tabs, NO broken Colors dropdown) */}
       <header
         className="sticky top-0 z-40 border-b border-white/10 backdrop-blur-md transition-colors duration-300"
         style={{
           backgroundColor: "var(--domus-header-bg)",
           color: "var(--domus-header-text)",
-          boxShadow: "0 4px 0 0 rgba(0,0,0,0.22), 0 14px 32px -12px rgba(0,0,0,0.3)",
+          boxShadow: "0 10px 30px -12px rgba(0, 0, 0, 0.28)",
         }}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          {/* Brand (click to return to Entryway Porch) */}
-          <button
-            onClick={() => handleNavigate("entry")}
-            className="flex shrink-0 items-center gap-3 text-left"
-          >
-            <motion.div
-              whileHover={{ y: -2, rotate: -5 }}
-              whileTap={{ y: 1, scale: 0.95 }}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
-              style={{
-                backgroundColor: "var(--domus-accent)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.3), 0 3px 0 0 var(--domus-accent-deep)",
-              }}
+          {/* Left: Home Brand + Residence Name + 1-click House Key */}
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setInRoomOwnerId(null)}
+              title="Back to Common Area"
+              className="flex shrink-0 items-center gap-2.5 text-left"
             >
-              <Home className="h-4 w-4" />
-            </motion.div>
-            <div className="flex items-center gap-2">
-              <span className="whitespace-nowrap text-base font-bold tracking-tight text-white">
-                Domus
-              </span>
-              <span className="hidden whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 xl:inline">
-                {session.household?.name ?? "Household"}
-              </span>
-              {session.household?.houseKey && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={handleCopyHeaderKey}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      handleCopyHeaderKey(e as unknown as React.MouseEvent);
-                    }
-                  }}
-                  title="Copy House Key"
-                  className="hidden cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2 py-0.5 font-mono text-[10px] font-bold text-white/90 transition hover:bg-white/20 xl:inline-flex"
-                >
-                  <KeyRound className="h-3 w-3 text-amber-300" />
-                  {session.household.houseKey}
-                  {copiedHouseKey ? (
-                    <Check className="h-3 w-3 text-emerald-300" />
-                  ) : (
-                    <Copy className="h-3 w-3 opacity-75" />
-                  )}
-                </span>
-              )}
-            </div>
-          </button>
+              <motion.div
+                whileHover={{ y: -2, rotate: -5 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white"
+                style={{
+                  backgroundColor: "var(--domus-accent)",
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.35), 0 4px 10px rgba(0,0,0,0.22)",
+                }}
+              >
+                <Home className="h-4 w-4" />
+              </motion.div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold tracking-tight text-white sm:text-base">
+                  {session.household?.name ?? "Domus"}
+                </p>
+                <p className="text-[10px] font-medium text-white/65">
+                  {inRoomOwnerId
+                    ? inRoomOwnerId === currentMember.id
+                      ? "Inside Your Private Room"
+                      : `Visiting ${memberById[inRoomOwnerId]?.name ?? "Room"}`
+                    : "Common Area"}
+                </p>
+              </div>
+            </button>
 
-          {/* Desktop 2.5D Single-Line Spring Pill Nav */}
-          <nav className="hidden shrink-0 items-center gap-1 rounded-2xl border border-white/15 bg-black/20 p-1.5 md:flex">
-            {navItems.map((item) => {
-              const active = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavigate(item.id)}
-                  className={`relative inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors ${
-                    active
-                      ? "text-white"
-                      : "text-white/75 hover:text-white"
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="domus-nav-pill"
-                      transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 32,
-                      }}
-                      className="absolute inset-0 rounded-xl"
-                      style={{
-                        backgroundColor: "var(--domus-accent)",
-                        boxShadow:
-                          "inset 0 1px 0 rgba(255,255,255,0.3), 0 3px 0 0 var(--domus-accent-deep)",
-                      }}
-                    />
-                  )}
-                  <span className="relative z-10 inline-flex items-center gap-2 whitespace-nowrap">
-                    {item.icon}
-                    {item.label}
-                    {item.badge && (
-                      <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-stone-900">
-                        {item.badge}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
+            {session.household?.houseKey && (
+              <button
+                type="button"
+                onClick={handleCopyHeaderKey}
+                title="Copy House Key to share with family"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-mono text-[11px] font-bold text-white/90 transition hover:bg-white/20 sm:inline-flex"
+              >
+                <KeyRound className="h-3 w-3 text-amber-300" />
+                {session.household.houseKey}
+                {copiedHouseKey ? (
+                  <Check className="h-3 w-3 text-emerald-300" />
+                ) : (
+                  <Copy className="h-3 w-3 opacity-75" />
+                )}
+              </button>
+            )}
+          </div>
 
-          {/* Right Controls: Palette Picker + Tour + Role Switcher + Avatar + Logout */}
+          {/* Right Controls: Incoming Knocks + Wall Paint + Demo Switcher + Avatar + Sign Out */}
           <div className="relative flex shrink-0 items-center gap-2">
-            {/* Live Color Theme Switcher */}
+            {/* Incoming Knocks Bell */}
             <div className="relative">
               <button
-                onClick={() => setPaletteOpen((v) => !v)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
-                title="Change color palette"
+                type="button"
+                onClick={() => {
+                  setKnocksOpen((v) => !v);
+                  setPaintOpen(false);
+                }}
+                title="Door knocks on your room"
+                className={`relative inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+                  pendingKnocks.length > 0
+                    ? "border-amber-300/50 bg-amber-400/20 text-amber-100 hover:bg-amber-400/30"
+                    : "border-white/20 bg-white/10 text-white/90 hover:bg-white/20"
+                }`}
               >
-                <Palette className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Colors</span>
+                <Bell className="h-3.5 w-3.5" />
+                {pendingKnocks.length > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-[#1e1916]">
+                    {pendingKnocks.length}
+                  </span>
+                )}
               </button>
-              {paletteOpen && (
-                <div className="domus-card absolute right-0 top-11 z-50 w-64 space-y-2 p-3 text-stone-900 shadow-2xl">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
-                    Choose House Color Palette
-                  </p>
-                  {GLOBAL_PALETTES.map((p) => (
+
+              {knocksOpen && (
+                <div className="domus-card absolute right-0 top-11 z-50 w-80 space-y-3 p-4 text-[#1e1916] shadow-2xl">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-[#1e1916]">
+                      Knocks on Your Door
+                    </p>
                     <button
-                      key={p.id}
-                      onClick={() => handleSelectPalette(p.id)}
-                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${
-                        palette === p.id
-                          ? "border-terracotta-500 bg-terracotta-50/70"
-                          : "border-stone-200 hover:border-stone-400"
-                      }`}
+                      type="button"
+                      onClick={() => setKnocksOpen(false)}
+                      className="rounded-lg p-1 text-[#6b5d53] hover:bg-black/5"
                     >
-                      <span>{p.name}</span>
-                      <span className="flex items-center gap-1">
-                        {p.swatches.map((hex, i) => (
-                          <span
-                            key={i}
-                            className="h-3.5 w-3.5 rounded-full border border-black/15"
-                            style={{ backgroundColor: hex }}
-                          />
-                        ))}
-                      </span>
+                      <X className="h-3.5 w-3.5" />
                     </button>
-                  ))}
+                  </div>
+
+                  {pendingKnocks.length === 0 ? (
+                    <p className="rounded-2xl bg-[#f3ede4] px-3 py-3 text-xs text-[#6b5d53]">
+                      Nobody is knocking on your door right now.
+                    </p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {pendingKnocks.map((k) => {
+                        const visitor = memberById[k.visitorId];
+                        return (
+                          <div
+                            key={k.id}
+                            className="space-y-2.5 rounded-2xl bg-[#f3ede4] p-3"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <MemberAvatar
+                                initials={visitor?.avatarInitials ?? "?"}
+                                color={visitor?.color ?? "#d45a33"}
+                                avatarId={visitor?.avatarId}
+                                size="sm"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-[#1e1916]">
+                                  {visitor?.name ?? "Family Member"} knocked
+                                </p>
+                                {k.message ? (
+                                  <p className="mt-0.5 text-xs text-[#574c44]">
+                                    &ldquo;{k.message}&rdquo;
+                                  </p>
+                                ) : (
+                                  <p className="mt-0.5 text-[11px] italic text-[#7c6e63]">
+                                    Knocked quietly (no note)
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRespondKnock(k.id, "ALLOWED")
+                                }
+                                className="domus-btn-accent flex-1 py-1.5 text-xs"
+                              >
+                                <DoorOpen className="h-3.5 w-3.5" />
+                                Let In
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRespondKnock(k.id, "DECLINED")
+                                }
+                                className="domus-btn-secondary flex-1 py-1.5 text-xs"
+                              >
+                                Not Now
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            <button
-              onClick={() => setTourOpen(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
-              title="Launch guided house tour"
-            >
-              <Compass className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Tour</span>
-            </button>
+            {/* Wall Paint Picker */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setPaintOpen((v) => !v);
+                  setKnocksOpen(false);
+                }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+                title="Change house wall paint"
+              >
+                <Paintbrush className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Wall Paint</span>
+              </button>
 
+              {paintOpen && (
+                <div className="domus-card absolute right-0 top-11 z-50 w-72 space-y-2.5 p-4 text-[#1e1916] shadow-2xl">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#6b5d53]">
+                      House Wall Paint
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPaintOpen(false)}
+                      className="rounded-lg p-1 text-[#6b5d53] hover:bg-black/5"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {WALL_PAINTS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleSelectPaint(p.id)}
+                        className={`flex w-full items-center justify-between rounded-2xl border px-3 py-2 text-left transition ${
+                          wallPaint === p.id
+                            ? "border-terracotta-500 bg-terracotta-50/70"
+                            : "border-stone-200/80 hover:border-stone-400"
+                        }`}
+                      >
+                        <div>
+                          <p className="text-xs font-bold text-[#1e1916]">
+                            {p.name}
+                          </p>
+                          <p className="text-[10px] text-[#6b5d53]">
+                            {p.description}
+                          </p>
+                        </div>
+                        <span
+                          className="h-6 w-6 shrink-0 rounded-full border-2 border-white shadow-sm"
+                          style={{ backgroundColor: p.swatch }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Demo Member Switcher (only shown inside /api/demo) */}
             {session.isDemoHouse && session.members.length > 1 && (
               <div className="hidden items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2.5 py-1.5 lg:flex">
                 <Shield className="h-3.5 w-3.5 shrink-0 text-amber-300" />
                 <select
-                  aria-label="Switch active family member"
+                  aria-label="Switch active demo family member"
                   value={currentMember.id}
                   onChange={(e) => handleDemoRoleSwitch(e.target.value)}
                   className="cursor-pointer bg-transparent text-xs font-semibold text-white focus:outline-none"
@@ -391,10 +439,12 @@ export default function DomusApp() {
               </div>
             )}
 
+            {/* Quick shortcut into Your Own Room */}
             <button
-              onClick={() => handleNavigate("room")}
+              type="button"
+              onClick={() => setInRoomOwnerId(currentMember.id)}
               className="flex shrink-0 items-center gap-2 text-left"
-              title="Open My Room"
+              title={`Open ${currentMember.name}'s Room`}
             >
               <MemberAvatar
                 initials={currentMember.avatarInitials}
@@ -408,87 +458,64 @@ export default function DomusApp() {
             </button>
 
             <button
+              type="button"
               onClick={handleLogout}
-              title="Sign out"
+              title="Leave House (Sign Out)"
               className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
-
-        {/* Mobile Nav Strip */}
-        <div className="flex gap-1.5 overflow-x-auto border-t border-stone-100 px-3 py-2 md:hidden">
-          {navItems.map((item) => {
-            const active = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleNavigate(item.id)}
-                className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold ${
-                  active
-                    ? "bg-stone-900 text-white"
-                    : "bg-stone-100 text-stone-600"
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Spatial Area: Common Area OR Inside a Room */}
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={`${activeTab}-${currentMember.id}-${visitingRoomOwnerId ?? "own"}`}
-            initial={{ opacity: 0, y: 14, scale: 0.992 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.992 }}
-            transition={{ type: "spring", stiffness: 320, damping: 28 }}
-          >
-            {activeTab === "entry" && (
-              <HouseEntryway
-                currentMember={currentMember}
-                household={session.household}
-                knockCount={knockCount}
-                onEnter={(tab) => handleNavigate(tab)}
-                onStartTour={() => setTourOpen(true)}
-              />
-            )}
-            {activeTab === "common" && (
-              <CommonAreaView
-                currentMember={currentMember}
-                members={session.members}
-                onNavigate={handleNavigate}
-              />
-            )}
-            {activeTab === "room" && (
+          {inRoomOwnerId ? (
+            <motion.div
+              key={`room-${inRoomOwnerId}-${currentMember.id}`}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              className="space-y-5"
+            >
+              <button
+                type="button"
+                onClick={() => setInRoomOwnerId(null)}
+                className="domus-btn-secondary text-xs"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to Common Area
+              </button>
+
               <PersonalRoomView
                 currentMember={currentMember}
-                roomOwnerId={visitingRoomOwnerId ?? currentMember.id}
+                roomOwnerId={inRoomOwnerId}
                 members={session.members}
-                onReturnToMyRoom={() => setVisitingRoomOwnerId(null)}
+                onReturnToMyRoom={() => setInRoomOwnerId(currentMember.id)}
                 onProfileChanged={loadSession}
               />
-            )}
-            {activeTab === "calendar" && (
-              <CalendarView
+            </motion.div>
+          ) : (
+            <motion.div
+              key={`common-${currentMember.id}`}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            >
+              <CommonAreaView
                 currentMember={currentMember}
+                household={session.household}
                 members={session.members}
-                initialBookMemberId={bookMemberId}
-              />
-            )}
-            {activeTab === "family" && (
-              <FamilyView
-                currentMember={currentMember}
+                onEnterRoom={(ownerId) => setInRoomOwnerId(ownerId)}
                 onHouseholdChanged={loadSession}
-                onVisitRoom={handleVisitRoom}
+                onKnocksChanged={refreshKnocks}
               />
-            )}
-          </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
     </div>

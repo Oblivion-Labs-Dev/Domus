@@ -1,37 +1,65 @@
-export type GlobalPaletteId = "botanical" | "midnight" | "coastal" | "espresso";
+export type WallPaintId =
+  | "plaster"
+  | "sage"
+  | "terracotta"
+  | "linen"
+  | "sky"
+  | "sandstone";
 
-export interface GlobalPalette {
-  id: GlobalPaletteId;
+// Keep alias exported so any existing imports stay compatible
+export type GlobalPaletteId = WallPaintId;
+
+export interface WallPaintOption {
+  id: WallPaintId;
   name: string;
-  tagline: string;
+  description: string;
+  swatch: string;
   swatches: [string, string, string];
-  isDark?: boolean;
 }
 
-export const GLOBAL_PALETTES: GlobalPalette[] = [
+export const WALL_PAINTS: WallPaintOption[] = [
   {
-    id: "botanical",
-    name: "Forest & Clay",
-    tagline: "Lush eucalyptus backdrop, deep forest ink & burnt terracotta",
-    swatches: ["#d8eae0", "#1c4536", "#d9532f"],
+    id: "plaster",
+    name: "Sunlit Plaster",
+    description: "Warm apricot clay & soft sage wash",
+    swatch: "#f3e2d3",
+    swatches: ["#f6e3d5", "#efe8df", "#d9eae0"],
   },
   {
-    id: "midnight",
-    name: "Midnight Studio",
-    tagline: "Deep slate-indigo night mode with glowing coral & emerald",
-    swatches: ["#0f172a", "#1e293b", "#f97316"],
-    isDark: true,
+    id: "sage",
+    name: "Sage Garden",
+    description: "Calm botanical eucalyptus walls",
+    swatch: "#d6e6db",
+    swatches: ["#d2e6d9", "#e5efe7", "#eef2ea"],
   },
   {
-    id: "coastal",
-    name: "Coastal Indigo",
-    tagline: "Crisp coastal mist, deep navy headers & warm golden ochre",
-    swatches: ["#dce7f3", "#1b365d", "#d97706"],
+    id: "terracotta",
+    name: "Warm Terracotta",
+    description: "Sunbaked clay & cozy peach plaster",
+    swatch: "#f2d6c4",
+    swatches: ["#f5d7c4", "#f0e1d4", "#e7cfc0"],
   },
   {
-    id: "espresso",
-    name: "Espresso & Amber",
-    tagline: "Rich warm sandstone, deep roast espresso & terracotta clay",
-    swatches: ["#e9dfd0", "#291e18", "#c94c24"],
+    id: "linen",
+    name: "Soft Linen",
+    description: "Bright, airy warm alabaster",
+    swatch: "#f4efe6",
+    swatches: ["#f7f3ec", "#efe9de", "#e7dfd1"],
+  },
+  {
+    id: "sky",
+    name: "Morning Sky",
+    description: "Dusty coastal blue & warm sand",
+    swatch: "#d8e6f3",
+    swatches: ["#d4e4f4", "#e7eff7", "#f2ebe2"],
+  },
+  {
+    id: "sandstone",
+    name: "Sandstone Dusk",
+    description: "Muted rose-sand evening plaster",
+    swatch: "#ead9d3",
+    swatches: ["#eddcd6", "#e7ddd8", "#dcd4d8"],
   },
 ];
+
+export const GLOBAL_PALETTES = WALL_PAINTS;
